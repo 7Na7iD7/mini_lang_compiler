@@ -15,311 +15,474 @@ class CodeEditor extends StatefulWidget {
   State<CodeEditor> createState() => _CodeEditorState();
 }
 
-class _CodeEditorState extends State<CodeEditor> with SingleTickerProviderStateMixin {
-  late final SyntaxHighlightingController _controller;
-  late final FocusNode _focusNode;
-  late final AnimationController _statusAnimController;
-  late final ScrollController _scrollController;
-  late final OverlayPortalController _autoCompleteController;
-  late final OverlayPortalController _signatureHelpController;
-  late final AdvancedCodeFoldingManager _foldingManager;
+class _CodeEditorState extends State<CodeEditor>
+    with SingleTickerProviderStateMixin {
 
-  bool _isHovering = false;
-  int _lineCount = 1;
-  int _currentLine = 1;
-  int _currentColumn = 1;
-  List<CompletionItem> _completions = [];
-  int _selectedCompletionIndex = 0;
+  late final SyntaxHighlightingController _textController;
+  late final FocusNode _focusNode;
+
+  late final ScrollController _textScrollController;
+  late final ScrollController _lineNumberScrollController;
+  late final ScrollController _foldingScrollController;
+
+  late final AnimationController _statusAnimController;
+
+  // Overlay portal controllers for floating UI
+  late final OverlayPortalController _autoCompletePortal;
+  late final OverlayPortalController _signatureHelpPortal;
+
+  // Code intelligence
+  late final AdvancedCodeFoldingManager _foldingManager;
   final LayerLink _layerLink = LayerLink();
 
+  // UI state
+  bool _isHovering = false;
+  bool _isInitialized = false;
+
+  // Editor metrics
+  int _lineCount = 1;
+  int _currentLine = 1;
+  int _currentColumn = 0;
+
+  // Code intelligence state
+  List<CompletionItem> _completions = [];
+  int _selectedCompletionIndex = 0;
   SignatureHelp? _currentSignatureHelp;
   List<CodeError> _diagnostics = [];
 
   @override
   void initState() {
     super.initState();
-    _initializeControllers();
-    _loadInitialCode();
+    _initializeComponents();
+    _setupEventListeners();
+    _scheduleInitialLoad();
   }
 
-  void _initializeControllers() {
-    _controller = SyntaxHighlightingController();
+  void _initializeComponents() {
+    _textController = SyntaxHighlightingController();
     _focusNode = FocusNode();
-    _scrollController = ScrollController();
-    _autoCompleteController = OverlayPortalController();
-    _signatureHelpController = OverlayPortalController();
+
+    _textScrollController = ScrollController();
+    _lineNumberScrollController = ScrollController();
+    _foldingScrollController = ScrollController();
+
+    _autoCompletePortal = OverlayPortalController();
+    _signatureHelpPortal = OverlayPortalController();
     _foldingManager = AdvancedCodeFoldingManager();
+
     _statusAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-
-    _controller.addListener(_updateLineCount);
-    _controller.addListener(_updateCursorPosition);
-    _controller.addListener(_updateDiagnostics);
-    _controller.addListener(_updateFoldingRegions);
-    _focusNode.addListener(_onFocusChange);
   }
 
-  void _onFocusChange() {
-    if (!_focusNode.hasFocus) {
-      _autoCompleteController.hide();
-      _signatureHelpController.hide();
+  void _setupEventListeners() {
+    _textController.addListener(_onTextControllerChanged);
+    _focusNode.addListener(_onFocusChanged);
+
+    _textScrollController.addListener(_syncScrollPositions);
+  }
+
+  void _syncScrollPositions() {
+    if (!_textScrollController.hasClients) return;
+
+    final offset = _textScrollController.offset;
+
+    if (_lineNumberScrollController.hasClients &&
+        _lineNumberScrollController.offset != offset) {
+      _lineNumberScrollController.jumpTo(offset);
+    }
+
+    // folding gutter
+    if (_foldingScrollController.hasClients &&
+        _foldingScrollController.offset != offset) {
+      _foldingScrollController.jumpTo(offset);
     }
   }
 
-  void _loadInitialCode() {
+  void _scheduleInitialLoad() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final provider = context.read<CompilerProvider>();
-        _updateControllerText(provider.sourceCode);
+      if (mounted && !_isInitialized) {
+        _loadInitialCode();
+        _isInitialized = true;
       }
     });
   }
 
-  void _updateLineCount() {
-    final newLineCount = '\n'.allMatches(_controller.text).length + 1;
-    if (newLineCount != _lineCount) {
-      setState(() => _lineCount = newLineCount);
-    }
+  void _loadInitialCode() {
+    final provider = context.read<CompilerProvider>();
+    _syncTextWithProvider(provider.sourceCode);
   }
 
-  void _updateCursorPosition() {
-    final cursorPos = _controller.selection.baseOffset;
-    if (cursorPos < 0) return;
+  void _onTextControllerChanged() {
+    _updateEditorMetrics();
+    _updateCodeIntelligence();
+  }
 
-    final textBeforeCursor = _controller.text.substring(0, cursorPos);
-    final newLine = '\n'.allMatches(textBeforeCursor).length + 1;
-    final lastLineBreak = textBeforeCursor.lastIndexOf('\n');
-    final newColumn = cursorPos - (lastLineBreak >= 0 ? lastLineBreak + 1 : 0);
+  void _updateEditorMetrics() {
+    final text = _textController.text;
+    final selection = _textController.selection;
 
-    if (newLine != _currentLine || newColumn != _currentColumn) {
+    // Calculate new metrics
+    final newLineCount = text.split('\n').length;
+    final cursorPos = selection.baseOffset.clamp(0, text.length);
+    final textBeforeCursor = text.substring(0, cursorPos);
+    final lines = textBeforeCursor.split('\n');
+    final newLine = lines.length;
+    final newColumn = lines.last.length;
+
+    // Batch update if anything changed
+    if (newLineCount != _lineCount ||
+        newLine != _currentLine ||
+        newColumn != _currentColumn) {
       setState(() {
+        _lineCount = newLineCount;
         _currentLine = newLine;
         _currentColumn = newColumn;
       });
     }
   }
 
+  void _updateCodeIntelligence() {
+    _updateDiagnostics();
+    _updateFoldingRegions();
+  }
+
   void _updateDiagnostics() {
-    final diagnostics = _controller.getDiagnostics();
-    if (diagnostics.length != _diagnostics.length || !identical(diagnostics, _diagnostics)) {
-      setState(() {
-        _diagnostics = diagnostics;
-      });
+    final newDiagnostics = _textController.getDiagnostics();
+    if (!_areDiagnosticsEqual(newDiagnostics, _diagnostics)) {
+      setState(() => _diagnostics = newDiagnostics);
     }
+  }
+
+  bool _areDiagnosticsEqual(List<CodeError> a, List<CodeError> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].line != b[i].line ||
+          a[i].message != b[i].message ||
+          a[i].severity != b[i].severity) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _updateFoldingRegions() {
-    _foldingManager.analyzeFoldingRegions(_controller.text);
-    setState(() {});
+    _foldingManager.analyzeFoldingRegions(_textController.text);
+    if (mounted) setState(() {});
   }
 
-  void _updateControllerText(String newText) {
-    if (_controller.text != newText) {
-      final cursorPos = _controller.selection.baseOffset;
-      _controller.text = newText;
-
-      final newPos = cursorPos.clamp(0, newText.length);
-      _controller.selection = TextSelection.collapsed(offset: newPos);
-
-      _foldingManager.analyzeFoldingRegions(newText);
+  void _onFocusChanged() {
+    if (!_focusNode.hasFocus) {
+      _hideAllOverlays();
     }
   }
 
-  void _handleTextChange(String text) {
-    _checkAutoComplete();
-    _checkSignatureHelp();
+  /// Hide all floating overlays
+  void _hideAllOverlays() {
+    _autoCompletePortal.hide();
+    _signatureHelpPortal.hide();
   }
 
-  void _checkAutoComplete() {
-    final cursorPos = _controller.selection.baseOffset;
+  // Text Synchronization
+  void _syncTextWithProvider(String newText) {
+    if (_textController.text == newText) return;
+
+    final cursorPos = _textController.selection.baseOffset;
+    _textController.text = newText;
+
+    // Restore cursor position intelligently
+    final newPos = cursorPos.clamp(0, newText.length);
+    _textController.selection = TextSelection.collapsed(offset: newPos);
+
+    _foldingManager.analyzeFoldingRegions(newText);
+  }
+
+  void _handleUserTextChange(String text) {
+    _triggerAutoComplete();
+    _triggerSignatureHelp();
+  }
+
+  // Auto-Completion System
+  void _triggerAutoComplete() {
+    final cursorPos = _textController.selection.baseOffset;
     if (cursorPos <= 0) {
-      _autoCompleteController.hide();
+      _autoCompletePortal.hide();
       return;
     }
 
-    final textBeforeCursor = _controller.text.substring(0, cursorPos);
-    final wordMatch = RegExp(r'[a-zA-Z_]\w*$').firstMatch(textBeforeCursor);
+    final textBeforeCursor = _textController.text.substring(0, cursorPos);
+    final match = RegExp(r'[a-zA-Z_]\w*$').firstMatch(textBeforeCursor);
 
-    if (wordMatch != null) {
-      final partialWord = wordMatch.group(0)!;
-      if (partialWord.length >= 2) {
-        final completions = _controller.getCompletionItems(partialWord, cursorPos);
-        if (completions.isNotEmpty) {
-          setState(() {
-            _completions = completions;
-            _selectedCompletionIndex = 0;
-          });
-          _autoCompleteController.show();
+    if (match != null) {
+      final word = match.group(0)!;
+      if (word.length >= 2) {
+        final items = _textController.getCompletionItems(word, cursorPos);
+        if (items.isNotEmpty) {
+          _showAutoComplete(items);
           return;
         }
       }
     }
 
-    _autoCompleteController.hide();
+    _autoCompletePortal.hide();
   }
 
-  void _checkSignatureHelp() {
-    final cursorPos = _controller.selection.baseOffset;
-    final signatureHelp = _controller.getSignatureHelp(cursorPos);
+  void _showAutoComplete(List<CompletionItem> items) {
+    setState(() {
+      _completions = items;
+      _selectedCompletionIndex = 0;
+    });
+    _autoCompletePortal.show();
+  }
+
+  void _insertCompletion(CompletionItem item) {
+    final cursorPos = _textController.selection.baseOffset;
+    final textBeforeCursor = _textController.text.substring(0, cursorPos);
+    final match = RegExp(r'[a-zA-Z_]\w*$').firstMatch(textBeforeCursor);
+
+    if (match == null) return;
+
+    final startPos = match.start;
+    final insertText = item.displayText;
+
+    // Build new text with completion
+    final newText = _textController.text.substring(0, startPos) +
+        insertText +
+        _textController.text.substring(cursorPos);
+
+    _textController.text = newText;
+
+    // Smart cursor positioning
+    int newCursorPos = startPos + insertText.length;
+    if (insertText.endsWith('()')) {
+      newCursorPos -= 1; // Place cursor inside parentheses
+
+      Future.delayed(const Duration(milliseconds: 100), _triggerSignatureHelp);
+    }
+
+    _textController.selection = TextSelection.collapsed(offset: newCursorPos);
+    _autoCompletePortal.hide();
+
+    HapticFeedback.selectionClick();
+  }
+
+  // Signature Help System
+  void _triggerSignatureHelp() {
+    final cursorPos = _textController.selection.baseOffset;
+    final signatureHelp = _textController.getSignatureHelp(cursorPos);
 
     if (signatureHelp != null) {
-      setState(() {
-        _currentSignatureHelp = signatureHelp;
-      });
-      _signatureHelpController.show();
+      setState(() => _currentSignatureHelp = signatureHelp);
+      _signatureHelpPortal.show();
     } else {
-      _signatureHelpController.hide();
+      _signatureHelpPortal.hide();
     }
   }
 
-  void _insertCompletion(CompletionItem completion) {
-    final cursorPos = _controller.selection.baseOffset;
-    final textBeforeCursor = _controller.text.substring(0, cursorPos);
-    final wordMatch = RegExp(r'[a-zA-Z_]\w*$').firstMatch(textBeforeCursor);
+  // Keyboard Shortcuts
 
-    if (wordMatch != null) {
-      final startPos = wordMatch.start;
-      final insertText = completion.displayText;
-      final newText = _controller.text.substring(0, startPos) +
-          insertText +
-          _controller.text.substring(cursorPos);
+  bool _handleKeyboardEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
 
-      _controller.text = newText;
-
-      int cursorOffset = startPos + insertText.length;
-      if (insertText.endsWith('()')) {
-        cursorOffset -= 1;
-      }
-
-      _controller.selection = TextSelection.collapsed(offset: cursorOffset);
-
-      if (insertText.endsWith('()')) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _checkSignatureHelp();
-        });
-      }
+    // Handle auto-complete overlay navigation
+    if (_autoCompletePortal.isShowing) {
+      return _handleAutoCompleteKeys(event);
     }
 
-    _autoCompleteController.hide();
+    // Handle global editor shortcuts
+    return _handleEditorShortcuts(event);
   }
 
-  bool _handleKeyEvent(KeyEvent event) {
-    if (event is KeyDownEvent) {
-      if (_autoCompleteController.isShowing) {
-        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-          setState(() {
-            _selectedCompletionIndex = (_selectedCompletionIndex + 1) % _completions.length;
-          });
-          return true;
-        } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-          setState(() {
-            _selectedCompletionIndex = (_selectedCompletionIndex - 1) % _completions.length;
-            if (_selectedCompletionIndex < 0) _selectedCompletionIndex = _completions.length - 1;
-          });
-          return true;
-        } else if (event.logicalKey == LogicalKeyboardKey.enter ||
-            event.logicalKey == LogicalKeyboardKey.tab) {
-          _insertCompletion(_completions[_selectedCompletionIndex]);
-          return true;
-        } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-          _autoCompleteController.hide();
-          return true;
-        }
-      }
+  bool _handleAutoCompleteKeys(KeyEvent event) {
+    final key = event.logicalKey;
 
-      if ((event.logicalKey == LogicalKeyboardKey.keyD) &&
-          (HardwareKeyboard.instance.isControlPressed ||
-              HardwareKeyboard.instance.isMetaPressed) &&
-          !HardwareKeyboard.instance.isShiftPressed) {
-        _duplicateLine();
-        return true;
-      }
-
-      if ((event.logicalKey == LogicalKeyboardKey.slash) &&
-          (HardwareKeyboard.instance.isControlPressed ||
-              HardwareKeyboard.instance.isMetaPressed)) {
-        _toggleComment();
-        return true;
-      }
-
-      if ((event.logicalKey == LogicalKeyboardKey.space) &&
-          (HardwareKeyboard.instance.isControlPressed ||
-              HardwareKeyboard.instance.isMetaPressed)) {
-        _checkAutoComplete();
-        return true;
-      }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _selectedCompletionIndex =
+            (_selectedCompletionIndex + 1) % _completions.length;
+      });
+      return true;
     }
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _selectedCompletionIndex =
+            (_selectedCompletionIndex - 1 + _completions.length) % _completions.length;
+      });
+      return true;
+    }
+
+    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.tab) {
+      _insertCompletion(_completions[_selectedCompletionIndex]);
+      return true;
+    }
+
+    if (key == LogicalKeyboardKey.escape) {
+      _autoCompletePortal.hide();
+      return true;
+    }
+
     return false;
   }
 
-  void _duplicateLine() {
-    final cursorPos = _controller.selection.baseOffset;
-    final text = _controller.text;
+  bool _handleEditorShortcuts(KeyEvent event) {
+    final isModifier = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
 
-    final lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1;
-    final lineEnd = text.indexOf('\n', cursorPos);
-    final actualLineEnd = lineEnd == -1 ? text.length : lineEnd;
+    if (!isModifier) return false;
 
-    final currentLine = text.substring(lineStart, actualLineEnd);
-    final newText = text.substring(0, actualLineEnd) + '\n' + currentLine + text.substring(actualLineEnd);
+    final key = event.logicalKey;
+    final isShift = HardwareKeyboard.instance.isShiftPressed;
 
-    _controller.text = newText;
-    _controller.selection = TextSelection.collapsed(offset: actualLineEnd + currentLine.length + 1);
+    // Ctrl/Cmd + D: Duplicate line
+    if (key == LogicalKeyboardKey.keyD && !isShift) {
+      _duplicateCurrentLine();
+      return true;
+    }
+
+    // Ctrl/Cmd + /: Toggle comment
+    if (key == LogicalKeyboardKey.slash) {
+      _toggleLineComment();
+      return true;
+    }
+
+    // Ctrl/Cmd + Space: Force auto-complete
+    if (key == LogicalKeyboardKey.space) {
+      _triggerAutoComplete();
+      return true;
+    }
+
+    // Ctrl/Cmd + S: Format code (custom)
+    if (key == LogicalKeyboardKey.keyS && isShift) {
+      _formatCode();
+      return true;
+    }
+
+    return false;
   }
 
-  void _toggleComment() {
-    final cursorPos = _controller.selection.baseOffset;
-    final text = _controller.text;
+  // Editor Commands
+  void _duplicateCurrentLine() {
+    final text = _textController.text;
+    final cursorPos = _textController.selection.baseOffset;
+    final lines = text.split('\n');
+
+    // Find current line
+    int pos = 0;
+    int lineIndex = 0;
+    for (int i = 0; i < lines.length; i++) {
+      if (pos + lines[i].length >= cursorPos) {
+        lineIndex = i;
+        break;
+      }
+      pos += lines[i].length + 1;
+    }
+
+    // Duplicate line
+    final currentLine = lines[lineIndex];
+    lines.insert(lineIndex + 1, currentLine);
+
+    final newText = lines.join('\n');
+    _textController.text = newText;
+
+    // Move cursor to duplicated line
+    final newCursorPos = pos + currentLine.length + 1;
+    _textController.selection = TextSelection.collapsed(offset: newCursorPos);
+
+    HapticFeedback.mediumImpact();
+  }
+
+  void _toggleLineComment() {
+    final text = _textController.text;
+    final cursorPos = _textController.selection.baseOffset;
 
     final lineStart = text.lastIndexOf('\n', cursorPos - 1) + 1;
     final lineEnd = text.indexOf('\n', cursorPos);
     final actualLineEnd = lineEnd == -1 ? text.length : lineEnd;
 
     final currentLine = text.substring(lineStart, actualLineEnd);
-    final trimmedLine = currentLine.trimLeft();
-    final leadingSpaces = currentLine.substring(0, currentLine.length - trimmedLine.length);
+    final trimmed = currentLine.trimLeft();
+    final spaces = currentLine.substring(0, currentLine.length - trimmed.length);
 
     String newLine;
-    int cursorOffset = 0;
+    int cursorOffset;
 
-    if (trimmedLine.startsWith('//')) {
-      newLine = leadingSpaces + trimmedLine.substring(2).trimLeft();
-      cursorOffset = -3;
+    if (trimmed.startsWith('//')) {
+      // Remove comment
+      final withoutComment = trimmed.substring(2).trimLeft();
+      newLine = spaces + withoutComment;
+      cursorOffset = -(trimmed.length - withoutComment.length);
     } else {
-      newLine = leadingSpaces + '// ' + trimmedLine;
+      newLine = '$spaces// $trimmed';
       cursorOffset = 3;
     }
 
-    final newText = text.substring(0, lineStart) + newLine + text.substring(actualLineEnd);
-    _controller.text = newText;
-    _controller.selection = TextSelection.collapsed(offset: cursorPos + cursorOffset);
+    final newText = text.substring(0, lineStart) +
+        newLine +
+        text.substring(actualLineEnd);
+
+    _textController.text = newText;
+    _textController.selection = TextSelection.collapsed(
+        offset: cursorPos + cursorOffset
+    );
+
+    HapticFeedback.lightImpact();
   }
 
   void _formatCode() {
-    final lines = _controller.text.split('\n');
-    final formattedLines = <String>[];
+    final lines = _textController.text.split('\n');
+    final formatted = <String>[];
     int indentLevel = 0;
 
     for (final line in lines) {
       final trimmed = line.trim();
-
-      if (trimmed.startsWith('}') || trimmed.startsWith(')') || trimmed.startsWith(']')) {
-        indentLevel = (indentLevel - 1).clamp(0, 100);
+      if (trimmed.isEmpty) {
+        formatted.add('');
+        continue;
       }
 
-      formattedLines.add('  ' * indentLevel + trimmed);
+      // Decrease indent for closing brackets
+      if (_startsWithClosing(trimmed)) {
+        indentLevel = (indentLevel - 1).clamp(0, 50);
+      }
 
-      if (trimmed.endsWith('{') || trimmed.endsWith('(') || trimmed.endsWith('[')) {
+      // Add formatted line
+      formatted.add('  ' * indentLevel + trimmed);
+
+      // Increase indent for opening brackets
+      if (_endsWithOpening(trimmed)) {
         indentLevel++;
       }
     }
 
-    _controller.text = formattedLines.join('\n');
-    HapticFeedback.lightImpact();
+    _textController.text = formatted.join('\n');
+    HapticFeedback.mediumImpact();
   }
 
+  bool _startsWithClosing(String line) {
+    return line.startsWith('}') ||
+        line.startsWith(')') ||
+        line.startsWith(']');
+  }
+
+  bool _endsWithOpening(String line) {
+    return line.endsWith('{') ||
+        line.endsWith('(') ||
+        line.endsWith('[');
+  }
+
+  void _handleClearCommand(CompilerProvider provider) {
+    _textController.clear();
+    provider.clear();
+    _foldingManager.clear();
+    setState(() => _diagnostics.clear());
+    _hideAllOverlays();
+
+    HapticFeedback.heavyImpact();
+  }
+
+  // Animation Management
   void _updateStatusAnimation(CompilerState state) {
     if (state == CompilerState.idle || state == CompilerState.completed) {
       _statusAnimController.forward();
@@ -328,106 +491,123 @@ class _CodeEditorState extends State<CodeEditor> with SingleTickerProviderStateM
     }
   }
 
-  void _handleClear(CompilerProvider provider) {
-    _controller.clear();
-    provider.clear();
-    _foldingManager.clear();
-    setState(() {
-      _diagnostics.clear();
-    });
-    HapticFeedback.lightImpact();
-  }
-
+  // Lifecycle
   @override
   void dispose() {
-    _controller.dispose();
+    _textController.dispose();
     _focusNode.dispose();
-    _scrollController.dispose();
+
+    _textScrollController.dispose();
+    _lineNumberScrollController.dispose();
+    _foldingScrollController.dispose();
+
     _statusAnimController.dispose();
     super.dispose();
   }
 
+  // Build Method
   @override
   Widget build(BuildContext context) {
     return Consumer<CompilerProvider>(
       builder: (context, provider, _) {
-        _updateControllerText(provider.sourceCode);
+        // Sync text with provider
+        _syncTextWithProvider(provider.sourceCode);
+
         _updateStatusAnimation(provider.state);
 
-        return CompositedTransformTarget(
-          link: _layerLink,
-          child: KeyboardListener(
-            focusNode: FocusNode(),
-            onKeyEvent: _handleKeyEvent,
-            child: Stack(
-              children: [
-                OverlayPortal(
-                  controller: _autoCompleteController,
-                  overlayChildBuilder: (context) => AutoCompleteOverlay(
-                    layerLink: _layerLink,
-                    currentLine: _currentLine,
-                    completions: _completions,
-                    selectedIndex: _selectedCompletionIndex,
-                    onSelect: _insertCompletion,
-                  ),
-                  child: OverlayPortal(
-                    controller: _signatureHelpController,
-                    overlayChildBuilder: (context) => SignatureHelpOverlay(
-                      layerLink: _layerLink,
-                      currentLine: _currentLine,
-                      signatureHelp: _currentSignatureHelp,
-                    ),
-                    child: CodeEditorContainer(
-                      isRunning: provider.isRunning,
-                      isFocused: _focusNode.hasFocus,
-                      isHovering: _isHovering,
-                      onHoverChange: (hovering) => setState(() => _isHovering = hovering),
-                      child: Column(
-                        children: [
-                          EditorHeader(
-                            provider: provider,
-                            onClear: () => _handleClear(provider),
-                            onLoadExample: () => provider.loadExampleCode('simple'),
-                            onFormat: _formatCode,
-                            errorCount: _diagnostics.where((d) => d.severity == ErrorSeverity.error).length,
-                            warningCount: _diagnostics.where((d) => d.severity == ErrorSeverity.warning).length,
-                          ),
-                          Expanded(
-                            child: EditorBody(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              scrollController: _scrollController,
-                              isRunning: provider.isRunning,
-                              lineCount: _lineCount,
-                              currentLine: _currentLine,
-                              diagnostics: _diagnostics,
-                              foldingManager: _foldingManager,
-                              onChanged: (text) {
-                                provider.setSourceCode(text);
-                                _handleTextChange(text);
-                              },
-                              onFoldingToggle: () => setState(() {}),
-                            ),
-                          ),
-                          EditorFooter(
-                            provider: provider,
-                            charCount: _controller.text.length,
-                            lineCount: _lineCount,
-                            currentLine: _currentLine,
-                            currentColumn: _currentColumn,
-                            statusAnimController: _statusAnimController,
-                            diagnostics: _diagnostics,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+        return _buildEditorLayout(provider);
+      },
+    );
+  }
+
+  Widget _buildEditorLayout(CompilerProvider provider) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: KeyboardListener(
+        focusNode: FocusNode(),
+        onKeyEvent: _handleKeyboardEvent,
+        child: _buildOverlayStack(provider),
+      ),
+    );
+  }
+
+  Widget _buildOverlayStack(CompilerProvider provider) {
+    return Stack(
+      children: [
+        OverlayPortal(
+          controller: _autoCompletePortal,
+          overlayChildBuilder: (_) => AutoCompleteOverlay(
+            layerLink: _layerLink,
+            currentLine: _currentLine,
+            completions: _completions,
+            selectedIndex: _selectedCompletionIndex,
+            onSelect: _insertCompletion,
+          ),
+          child: OverlayPortal(
+            controller: _signatureHelpPortal,
+            overlayChildBuilder: (_) => SignatureHelpOverlay(
+              layerLink: _layerLink,
+              currentLine: _currentLine,
+              signatureHelp: _currentSignatureHelp,
+            ),
+            child: _buildEditorContent(provider),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditorContent(CompilerProvider provider) {
+    return CodeEditorContainer(
+      isRunning: provider.isRunning,
+      isFocused: _focusNode.hasFocus,
+      isHovering: _isHovering,
+      onHoverChange: (hovering) => setState(() => _isHovering = hovering),
+      child: Column(
+        children: [
+          EditorHeader(
+            provider: provider,
+            onClear: () => _handleClearCommand(provider),
+            onLoadExample: () => provider.loadExampleCode('simple'),
+            onFormat: _formatCode,
+            errorCount: _diagnostics
+                .where((d) => d.severity == ErrorSeverity.error)
+                .length,
+            warningCount: _diagnostics
+                .where((d) => d.severity == ErrorSeverity.warning)
+                .length,
+          ),
+          Expanded(
+            child: EditorBody(
+              controller: _textController,
+              focusNode: _focusNode,
+              textScrollController: _textScrollController,
+              lineNumberScrollController: _lineNumberScrollController,
+              foldingScrollController: _foldingScrollController,
+
+              isRunning: provider.isRunning,
+              lineCount: _lineCount,
+              currentLine: _currentLine,
+              diagnostics: _diagnostics,
+              foldingManager: _foldingManager,
+              onChanged: (text) {
+                provider.setSourceCode(text);
+                _handleUserTextChange(text);
+              },
+              onFoldingToggle: () => setState(() {}),
             ),
           ),
-        );
-      },
+          EditorFooter(
+            provider: provider,
+            charCount: _textController.text.length,
+            lineCount: _lineCount,
+            currentLine: _currentLine,
+            currentColumn: _currentColumn,
+            statusAnimController: _statusAnimController,
+            diagnostics: _diagnostics,
+          ),
+        ],
+      ),
     );
   }
 }

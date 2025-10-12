@@ -279,32 +279,93 @@ class AnimatedRunButton extends StatefulWidget {
 }
 
 class _AnimatedRunButtonState extends State<AnimatedRunButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+    with TickerProviderStateMixin {
+  late AnimationController _pressController;
+  late AnimationController _pulseController;
+  late AnimationController _shimmerController;
+  late AnimationController _rotationController;
+
   late Animation<double> _scaleAnimation;
   late Animation<double> _elevationAnimation;
+  late Animation<double> _pulseAnimation;
+  late Animation<double> _shimmerAnimation;
+  late Animation<double> _rotationAnimation;
+
   bool _isPressed = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    // Press animation
+    _pressController = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    // Pulse animation for running state
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
     );
 
-    _elevationAnimation = Tween<double>(begin: 8.0, end: 2.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    // Shimmer effect
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    // Rotation for loading icon
+    _rotationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.94).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
+    );
+
+    _elevationAnimation = Tween<double>(begin: 12.0, end: 4.0).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
+    );
+
+    _pulseAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.05), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.05, end: 1.0), weight: 1),
+    ]).animate(CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOut,
+    ));
+
+    _shimmerAnimation = Tween<double>(begin: -1.5, end: 1.5).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
+    );
+
+    _rotationAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _rotationController, curve: Curves.linear),
     );
   }
 
   @override
+  void didUpdateWidget(AnimatedRunButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isRunning && !oldWidget.isRunning) {
+      _pulseController.repeat();
+      _shimmerController.repeat();
+      _rotationController.repeat();
+    } else if (!widget.isRunning && oldWidget.isRunning) {
+      _pulseController.stop();
+      _shimmerController.stop();
+      _rotationController.stop();
+    }
+  }
+
+  @override
   void dispose() {
-    _controller.dispose();
+    _pressController.dispose();
+    _pulseController.dispose();
+    _shimmerController.dispose();
+    _rotationController.dispose();
     super.dispose();
   }
 
@@ -315,13 +376,13 @@ class _AnimatedRunButtonState extends State<AnimatedRunButton>
           ? null
           : (_) {
         setState(() => _isPressed = true);
-        _controller.forward();
+        _pressController.forward();
       },
       onTapUp: widget.isRunning
           ? null
           : (_) {
         setState(() => _isPressed = false);
-        _controller.reverse();
+        _pressController.reverse();
         if (widget.onPressed != null) {
           HapticFeedback.mediumImpact();
           widget.onPressed!();
@@ -329,79 +390,139 @@ class _AnimatedRunButtonState extends State<AnimatedRunButton>
       },
       onTapCancel: () {
         setState(() => _isPressed = false);
-        _controller.reverse();
+        _pressController.reverse();
       },
       child: AnimatedBuilder(
-        animation: _controller,
+        animation: Listenable.merge([
+          _pressController,
+          _pulseController,
+          _shimmerController,
+          _rotationController,
+        ]),
         builder: (context, _) {
+          final scale = widget.isRunning
+              ? _scaleAnimation.value * _pulseAnimation.value
+              : _scaleAnimation.value;
+
           return Transform.scale(
-            scale: _scaleAnimation.value,
+            scale: scale,
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: widget.isRunning
-                      ? [const Color(0xFF9E9E9E), const Color(0xFF757575)]
-                      : [const Color(0xFF42A5F5), const Color(0xFF1E88E5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: (widget.isRunning
-                        ? Colors.grey
-                        : const Color(0xFF42A5F5))
-                        .withOpacity(0.4),
-                    blurRadius: _elevationAnimation.value * 2,
-                    spreadRadius: _elevationAnimation.value / 4,
-                    offset: Offset(0, _elevationAnimation.value / 2),
+                    color: _getGradientColors().first.withOpacity(0.4),
+                    blurRadius: widget.isRunning ? 20 : _elevationAnimation.value * 2,
+                    spreadRadius: widget.isRunning ? 2 : _elevationAnimation.value / 4,
+                    offset: Offset(0, widget.isRunning ? 6 : _elevationAnimation.value / 2),
+                  ),
+                  BoxShadow(
+                    color: _getGradientColors().last.withOpacity(0.3),
+                    blurRadius: widget.isRunning ? 30 : _elevationAnimation.value * 3,
+                    spreadRadius: widget.isRunning ? -5 : 0,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: widget.isRunning ? null : widget.onPressed,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (widget.isRunning)
-                          const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        else
-                          const Icon(
-                            Icons.play_arrow_rounded,
-                            size: 24,
-                            color: Colors.white,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Stack(
+                    children: [
+                      // Main gradient background
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: _getGradientColors(),
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        const SizedBox(width: 10),
-                        Text(
-                          widget.label ??
-                              (widget.isRunning
-                                  ? 'در حال اجرا...'
-                                  : 'کامپایل و اجرا'),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+
+                      // Shimmer overlay when running
+                      if (widget.isRunning)
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Transform.translate(
+                              offset: Offset(_shimmerAnimation.value * 300, 0),
+                              child: Container(
+                                width: 150,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.white.withOpacity(0.3),
+                                      Colors.white.withOpacity(0.5),
+                                      Colors.white.withOpacity(0.3),
+                                      Colors.transparent,
+                                    ],
+                                    stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+
+                      // Glass morphism layer
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.2),
+                              Colors.white.withOpacity(0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+
+                      // Content
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: widget.isRunning ? null : widget.onPressed,
+                          borderRadius: BorderRadius.circular(24),
+                          splashColor: Colors.white.withOpacity(0.2),
+                          highlightColor: Colors.white.withOpacity(0.1),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 18,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildIcon(),
+                                const SizedBox(width: 14),
+                                Text(
+                                  widget.label ?? _getDefaultLabel(),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: 0.8,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -410,6 +531,87 @@ class _AnimatedRunButtonState extends State<AnimatedRunButton>
         },
       ),
     );
+  }
+
+  Widget _buildIcon() {
+    if (widget.isRunning) {
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          // Outer rotating circle
+          Transform.rotate(
+            angle: _rotationAnimation.value * 2 * 3.14159,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 2.5,
+                ),
+              ),
+            ),
+          ),
+          // Inner spinning icon
+          Transform.rotate(
+            angle: -_rotationAnimation.value * 2 * 3.14159,
+            child: const Icon(
+              Icons.autorenew_rounded,
+              size: 26,
+              color: Colors.white,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.2),
+        ),
+        child: const Icon(
+          Icons.rocket_launch_rounded,
+          size: 22,
+          color: Colors.white,
+          shadows: [
+            Shadow(
+              color: Colors.black26,
+              offset: Offset(0, 2),
+              blurRadius: 4,
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  List<Color> _getGradientColors() {
+    if (widget.isRunning) {
+      return [
+        const Color(0xFFFF6B9D), // Pink
+        const Color(0xFFC06C84), // Rose
+        const Color(0xFF9B59B6), // Purple
+      ];
+    } else {
+      return [
+        const Color(0xFF667EEA), // Indigo
+        const Color(0xFF764BA2), // Purple
+        const Color(0xFFF093FB), // Pink
+      ];
+    }
+  }
+
+  String _getDefaultLabel() {
+    return widget.isRunning ? 'در حال اجرا...' : 'کامپایل و اجرا';
   }
 }
 

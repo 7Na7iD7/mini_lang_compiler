@@ -4,8 +4,13 @@ import '../models/ast_nodes.dart';
 class InterpreterResult {
   final String output;
   final int executionTime;
+  final List<String> executionLog;
 
-  InterpreterResult({required this.output, required this.executionTime});
+  InterpreterResult({
+    required this.output,
+    required this.executionTime,
+    required this.executionLog,
+  });
 }
 
 class InterpreterConfig {
@@ -21,6 +26,7 @@ class Interpreter implements ASTVisitor<dynamic> {
   final Map<String, FunctionDeclaration> functionTable = {};
   final List<CompilerError> errors = [];
   final StringBuffer _output = StringBuffer();
+  final List<String> _executionLog = []; // Changed to private
   int _executionTime = 0;
   dynamic _returnValue;
   bool _shouldReturn = false;
@@ -31,21 +37,35 @@ class Interpreter implements ASTVisitor<dynamic> {
 
   Interpreter(this.program);
 
+  List<String> getExecutionLog() {
+    return List.unmodifiable(_executionLog);
+  }
+
+  void _log(String message) {
+    _executionLog.add(message);
+  }
+
   InterpreterResult interpret() {
     final stopwatch = Stopwatch()..start();
+    _log('=== Interpreter Started ===');
+
     try {
+      _log('Phase 1: Registering functions');
       for (final statement in program.statements) {
         if (statement is FunctionDeclaration) {
           if (functionTable.containsKey(statement.name)) {
+            _log('Warning: Function "${statement.name}" redefined');
             errors.add(CompilerError.warning(
               message: 'Function ${statement.name} is already defined. Overwriting previous definition.',
               phase: 'Interpreter',
             ));
           }
           functionTable[statement.name] = statement;
+          _log('Registered function "${statement.name}" with ${statement.parameters.length} parameter(s)');
         }
       }
 
+      _log('Phase 2: Executing global statements');
       for (final statement in program.statements) {
         if (statement is! FunctionDeclaration) {
           statement.accept(this);
@@ -54,10 +74,12 @@ class Interpreter implements ASTVisitor<dynamic> {
       }
 
       if (functionTable.containsKey('main')) {
+        _log('Phase 3: Calling main() function');
         final mainFunc = functionTable['main']!;
         if (mainFunc.parameters.isEmpty) {
           visitFunctionCall(FunctionCall(name: 'main', arguments: []));
         } else {
+          _log('Warning: main() requires parameters, skipping execution');
           errors.add(CompilerError.warning(
             message: 'Function main found but requires parameters. main() should be parameterless.',
             phase: 'Interpreter',
@@ -65,14 +87,17 @@ class Interpreter implements ASTVisitor<dynamic> {
         }
       }
     } catch (e, stack) {
+      _log('FATAL ERROR: ${e.toString()}');
       errors.add(CompilerError.error(
         message: 'Runtime Execution Error: ${e.toString()}',
         phase: 'Interpreter',
       ));
       print('Interpreter error stack trace: $stack');
     }
+
     stopwatch.stop();
     _executionTime = stopwatch.elapsedMilliseconds;
+    _log('=== Interpreter Finished (${_executionTime}ms) ===');
 
     var outputStr = _output.toString();
     if (outputStr.length > InterpreterConfig.maxOutputLength) {
@@ -81,8 +106,9 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     return InterpreterResult(
-        output: outputStr,
-        executionTime: _executionTime
+      output: outputStr,
+      executionTime: _executionTime,
+      executionLog: _executionLog,
     );
   }
 
@@ -130,8 +156,16 @@ class Interpreter implements ASTVisitor<dynamic> {
     return globalSymbolTable.containsKey(name);
   }
 
+  String _formatValue(dynamic value) {
+    if (value == null) return 'null';
+    if (value is String) return '"$value"';
+    if (value is List) return '[${value.join(', ')}]';
+    return value.toString();
+  }
+
   @override
   dynamic visitProgram(Program node) {
+    _log('Visiting Program with ${node.statements.length} statement(s)');
     for (final statement in node.statements) {
       statement.accept(this);
       if (_shouldReturn) break;
@@ -142,25 +176,34 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitVariableDeclaration(VariableDeclaration node) {
     final value = node.initialValue?.accept(this) ?? _getDefaultValue(node.type);
+    final scope = _isInFunction ? 'local' : 'global';
+
     if (_isInFunction) {
       localSymbolTable[node.name] = value;
     } else {
       globalSymbolTable[node.name] = value;
     }
+
+    _log('Declare variable "$node.name" of type ${node.type} = ${_formatValue(value)} [$scope]');
     return null;
   }
 
   @override
   dynamic visitAssignment(Assignment node) {
     if (!_hasVariable(node.name)) {
+      _log('ERROR: Variable "${node.name}" not declared');
       errors.add(CompilerError.error(
         message: 'Variable ${node.name} not declared.',
         phase: 'Interpreter',
       ));
       return null;
     }
+
+    final oldValue = _getVariable(node.name);
     final value = node.value.accept(this);
     _setVariable(node.name, value);
+
+    _log('Assign "${node.name}" = ${_formatValue(value)} (was: ${_formatValue(oldValue)})');
     return value;
   }
 
@@ -169,6 +212,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     final value = node.expression.accept(this);
 
     if (_output.length > InterpreterConfig.maxOutputLength) {
+      _log('ERROR: Output buffer limit exceeded');
       errors.add(CompilerError.error(
         message: 'Output buffer limit exceeded',
         phase: 'Interpreter',
@@ -178,8 +222,11 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     if (value == null) {
       _output.writeln('null');
+      _log('Print: null');
     } else {
-      _output.writeln(value.toString().replaceAll(r'\n', '\n'));
+      final displayValue = value.toString().replaceAll(r'\n', '\n');
+      _output.writeln(displayValue);
+      _log('Print: ${_formatValue(value)}');
     }
     return null;
   }
@@ -187,10 +234,16 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitIfStatement(IfStatement node) {
     final condition = node.condition.accept(this);
+    _log('If condition evaluated to: $condition');
+
     if (condition == true) {
+      _log('Executing THEN branch');
       node.thenBranch.accept(this);
     } else if (node.elseBranch != null) {
+      _log('Executing ELSE branch');
       node.elseBranch!.accept(this);
+    } else {
+      _log('Condition false, no ELSE branch');
     }
     return null;
   }
@@ -198,19 +251,26 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitWhileStatement(WhileStatement node) {
     int iterations = 0;
+    _log('While loop started');
 
     while (iterations < InterpreterConfig.maxIterations && errors.isEmpty) {
       final condition = node.condition.accept(this);
-      if (condition != true) break;
+      if (condition != true) {
+        _log('While loop ended after $iterations iteration(s)');
+        break;
+      }
 
+      _log('While iteration ${iterations + 1}');
       node.body.accept(this);
       iterations++;
 
       if (_shouldBreak) {
+        _log('Break statement executed in while loop');
         _shouldBreak = false;
         break;
       }
       if (_shouldContinue) {
+        _log('Continue statement executed in while loop');
         _shouldContinue = false;
         continue;
       }
@@ -218,6 +278,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (iterations >= InterpreterConfig.maxIterations) {
+      _log('ERROR: Infinite loop detected in While statement');
       errors.add(CompilerError.error(
         message: 'Possible infinite loop detected in While statement (exceeded ${InterpreterConfig.maxIterations} iterations).',
         phase: 'Interpreter',
@@ -229,10 +290,11 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitDoWhileStatement(DoWhileStatement node) {
     int iterations = 0;
+    _log('Do-While loop started');
 
-    // FIXED: Simplified and more reliable do-while loop
     do {
       if (iterations >= InterpreterConfig.maxIterations) {
+        _log('ERROR: Infinite loop detected in Do-While statement');
         errors.add(CompilerError.error(
           message: 'Possible infinite loop detected in Do-While statement (exceeded ${InterpreterConfig.maxIterations} iterations).',
           phase: 'Interpreter',
@@ -240,10 +302,12 @@ class Interpreter implements ASTVisitor<dynamic> {
         break;
       }
 
+      _log('Do-While iteration ${iterations + 1}');
       node.body.accept(this);
       iterations++;
 
       if (_shouldBreak) {
+        _log('Break statement executed in do-while loop');
         _shouldBreak = false;
         break;
       }
@@ -251,14 +315,16 @@ class Interpreter implements ASTVisitor<dynamic> {
       if (_shouldReturn) break;
 
       if (_shouldContinue) {
+        _log('Continue statement executed in do-while loop');
         _shouldContinue = false;
       }
 
-      // Check condition after each iteration
       final condition = node.condition.accept(this);
-      if (condition != true) break;
+      if (condition != true) {
+        _log('Do-While loop ended after $iterations iteration(s)');
+        break;
+      }
 
-      // Safety check for errors
       if (errors.isNotEmpty) break;
 
     } while (true);
@@ -269,21 +335,28 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitForStatement(ForStatement node) {
     final savedLocalSymbols = Map<String, dynamic>.from(localSymbolTable);
+    _log('For loop started');
 
     node.initializer?.accept(this);
     int currentIteration = 0;
 
     while (currentIteration < InterpreterConfig.maxIterations && errors.isEmpty) {
       final condition = node.condition?.accept(this) ?? true;
-      if (condition != true) break;
+      if (condition != true) {
+        _log('For loop ended after $currentIteration iteration(s)');
+        break;
+      }
 
+      _log('For iteration ${currentIteration + 1}');
       node.body.accept(this);
 
       if (_shouldBreak) {
+        _log('Break statement executed in for loop');
         _shouldBreak = false;
         break;
       }
       if (_shouldContinue) {
+        _log('Continue statement executed in for loop');
         _shouldContinue = false;
         node.increment?.accept(this);
         currentIteration++;
@@ -305,6 +378,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (currentIteration >= InterpreterConfig.maxIterations) {
+      _log('ERROR: Infinite loop detected in For statement');
       errors.add(CompilerError.error(
         message: 'Possible infinite loop detected in For statement (exceeded ${InterpreterConfig.maxIterations} iterations).',
         phase: 'Interpreter',
@@ -316,15 +390,18 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitSwitchStatement(SwitchStatement node) {
     final switchValue = node.expression.accept(this);
+    _log('Switch on value: ${_formatValue(switchValue)}');
     bool matched = false;
 
     for (final caseNode in node.cases) {
       final caseValue = caseNode.value.accept(this);
       if (switchValue == caseValue) {
+        _log('Switch case matched: ${_formatValue(caseValue)}');
         matched = true;
         caseNode.body.accept(this);
 
         if (_shouldBreak) {
+          _log('Break from switch');
           _shouldBreak = false;
           break;
         }
@@ -333,10 +410,13 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (!matched && node.defaultCase != null) {
+      _log('Switch default case executed');
       node.defaultCase!.accept(this);
       if (_shouldBreak) {
         _shouldBreak = false;
       }
+    } else if (!matched) {
+      _log('No switch case matched');
     }
 
     return null;
@@ -349,12 +429,14 @@ class Interpreter implements ASTVisitor<dynamic> {
 
   @override
   dynamic visitBreakStatement(BreakStatement node) {
+    _log('Break statement');
     _shouldBreak = true;
     return null;
   }
 
   @override
   dynamic visitContinueStatement(ContinueStatement node) {
+    _log('Continue statement');
     _shouldContinue = true;
     return null;
   }
@@ -368,10 +450,12 @@ class Interpreter implements ASTVisitor<dynamic> {
   dynamic visitFunctionCall(FunctionCall node) {
     final variable = _getVariable(node.name);
     if (variable is LambdaFunction) {
+      _log('Calling lambda function with ${node.arguments.length} argument(s)');
       return _executeLambda(variable, node.arguments);
     }
 
     if (!functionTable.containsKey(node.name)) {
+      _log('ERROR: Function "${node.name}" not defined');
       errors.add(CompilerError.error(
         message: 'Function ${node.name} not defined.',
         phase: 'Interpreter',
@@ -381,6 +465,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     final funcDecl = functionTable[node.name]!;
     if (node.arguments.length != funcDecl.parameters.length) {
+      _log('ERROR: Function "${node.name}" argument count mismatch');
       errors.add(CompilerError.error(
         message: 'Function ${node.name} expects ${funcDecl.parameters.length} arguments but received ${node.arguments.length}.',
         phase: 'Interpreter',
@@ -389,8 +474,11 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     _recursionDepth++;
+    _log('Call function "${node.name}" (depth: $_recursionDepth)');
+
     if (_recursionDepth > InterpreterConfig.maxRecursionDepth) {
       _recursionDepth--;
+      _log('ERROR: Maximum recursion depth exceeded');
       errors.add(CompilerError.error(
         message: 'Maximum recursion depth exceeded (${InterpreterConfig.maxRecursionDepth}). Possible infinite recursion in function ${node.name}.',
         phase: 'Interpreter',
@@ -424,14 +512,18 @@ class Interpreter implements ASTVisitor<dynamic> {
 
       for (int i = 0; i < funcDecl.parameters.length; i++) {
         localSymbolTable[funcDecl.parameters[i].value] = evaluatedArgs[i];
+        _log('  Parameter "${funcDecl.parameters[i].value}" = ${_formatValue(evaluatedArgs[i])}');
       }
 
       funcDecl.body.accept(this);
 
       if (_shouldReturn) {
         result = _returnValue;
+        _log('Function "${node.name}" returned: ${_formatValue(result)}');
         _shouldReturn = false;
         _returnValue = null;
+      } else {
+        _log('Function "${node.name}" finished without explicit return');
       }
 
       if (funcDecl.returnType != 'void' && result == null && !_shouldReturn) {
@@ -455,6 +547,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
   dynamic _executeLambda(LambdaFunction lambda, List<ASTNode> arguments) {
     if (arguments.length != lambda.parameters.length) {
+      _log('ERROR: Lambda argument count mismatch');
       errors.add(CompilerError.error(
         message: 'Lambda expects ${lambda.parameters.length} arguments but received ${arguments.length}.',
         phase: 'Interpreter',
@@ -478,9 +571,11 @@ class Interpreter implements ASTVisitor<dynamic> {
 
       for (int i = 0; i < lambda.parameters.length; i++) {
         localSymbolTable[lambda.parameters[i].value] = evaluatedArgs[i];
+        _log('  Lambda parameter "${lambda.parameters[i].value}" = ${_formatValue(evaluatedArgs[i])}');
       }
 
       result = lambda.body.accept(this);
+      _log('Lambda returned: ${_formatValue(result)}');
 
     } finally {
       localSymbolTable = savedLocalSymbols;
@@ -492,6 +587,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
   @override
   dynamic visitLambdaFunction(LambdaFunction node) {
+    _log('Lambda function created with ${node.parameters.length} parameter(s)');
     return node;
   }
 
@@ -504,6 +600,7 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitArrayDeclaration(ArrayDeclaration node) {
     if (node.size <= 0) {
+      _log('ERROR: Array size must be positive');
       errors.add(CompilerError.error(
         message: 'Array size must be positive, got ${node.size}.',
         phase: 'Interpreter',
@@ -513,6 +610,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     const maxArraySize = 10000;
     if (node.size > maxArraySize) {
+      _log('ERROR: Array size exceeds maximum');
       errors.add(CompilerError.error(
         message: 'Array size exceeds maximum allowed size of $maxArraySize.',
         phase: 'Interpreter',
@@ -528,6 +626,8 @@ class Interpreter implements ASTVisitor<dynamic> {
     } else {
       globalSymbolTable[node.name] = array;
     }
+
+    _log('Declare array "${node.name}" of type ${node.type}[${node.size}]');
     return null;
   }
 
@@ -536,6 +636,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     final array = _getVariable(node.name);
 
     if (array == null) {
+      _log('ERROR: Array "${node.name}" not declared');
       errors.add(CompilerError.error(
           message: 'Array ${node.name} not declared.',
           phase: 'Interpreter'
@@ -544,6 +645,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (array is! List) {
+      _log('ERROR: "${node.name}" is not an array');
       errors.add(CompilerError.error(
           message: '${node.name} is not an array.',
           phase: 'Interpreter'
@@ -553,6 +655,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     final index = node.index.accept(this);
     if (index == null) {
+      _log('ERROR: Array index cannot be null');
       errors.add(CompilerError.error(
           message: 'Array index cannot be null.',
           phase: 'Interpreter'
@@ -561,6 +664,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (index is! num) {
+      _log('ERROR: Array index must be numeric');
       errors.add(CompilerError.error(
           message: 'Array index must be a number, got ${index.runtimeType}.',
           phase: 'Interpreter'
@@ -570,6 +674,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     final idx = index.toInt();
     if (idx < 0 || idx >= array.length) {
+      _log('ERROR: Array index $idx out of bounds');
       errors.add(CompilerError.error(
           message: 'Array index $idx is out of bounds for array ${node.name} with size ${array.length}.',
           phase: 'Interpreter'
@@ -577,7 +682,9 @@ class Interpreter implements ASTVisitor<dynamic> {
       return null;
     }
 
-    return array[idx];
+    final value = array[idx];
+    _log('Array access "${node.name}[$idx]" = ${_formatValue(value)}');
+    return value;
   }
 
   @override
@@ -585,6 +692,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     final array = _getVariable(node.name);
 
     if (array == null) {
+      _log('ERROR: Array "${node.name}" not declared');
       errors.add(CompilerError.error(
           message: 'Array ${node.name} not declared.',
           phase: 'Interpreter'
@@ -593,6 +701,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (array is! List) {
+      _log('ERROR: "${node.name}" is not an array');
       errors.add(CompilerError.error(
           message: '${node.name} is not an array.',
           phase: 'Interpreter'
@@ -602,6 +711,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     final index = node.index.accept(this);
     if (index == null) {
+      _log('ERROR: Array index cannot be null');
       errors.add(CompilerError.error(
           message: 'Array index cannot be null.',
           phase: 'Interpreter'
@@ -610,6 +720,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (index is! num) {
+      _log('ERROR: Array index must be numeric');
       errors.add(CompilerError.error(
           message: 'Array index must be a number, got ${index.runtimeType}.',
           phase: 'Interpreter'
@@ -619,6 +730,7 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     final idx = index.toInt();
     if (idx < 0 || idx >= array.length) {
+      _log('ERROR: Array index $idx out of bounds');
       errors.add(CompilerError.error(
           message: 'Array index $idx is out of bounds for array ${node.name} with size ${array.length}.',
           phase: 'Interpreter'
@@ -628,18 +740,21 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     final value = node.value.accept(this);
     array[idx] = value;
+    _log('Array assign "${node.name}[$idx]" = ${_formatValue(value)}');
     return value;
   }
 
   @override
   dynamic visitReturnStatement(ReturnStatement node) {
     _returnValue = node.value?.accept(this);
+    _log('Return statement: ${_formatValue(_returnValue)}');
     _shouldReturn = true;
     return null;
   }
 
   @override
   dynamic visitBlock(Block node) {
+    _log('Block with ${node.statements.length} statement(s)');
     for (final statement in node.statements) {
       statement.accept(this);
       if (_shouldReturn || _shouldBreak || _shouldContinue) return null;
@@ -653,6 +768,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     final right = node.right.accept(this);
 
     if (left == null || right == null) {
+      _log('ERROR: Binary operation on null values');
       errors.add(CompilerError.error(
         message: 'Cannot perform binary operation on null values.',
         phase: 'Interpreter',
@@ -661,25 +777,33 @@ class Interpreter implements ASTVisitor<dynamic> {
     }
 
     if (node.operator == '+' && (left is String || right is String)) {
-      return left.toString() + right.toString();
+      final result = left.toString() + right.toString();
+      _log('Binary: ${_formatValue(left)} + ${_formatValue(right)} = ${_formatValue(result)}');
+      return result;
     }
 
     if (node.operator == '&&' || node.operator == '||') {
       if (left is! bool || right is! bool) {
+        _log('ERROR: Logical operator requires boolean operands');
         errors.add(CompilerError.error(
           message: 'Logical operators (${node.operator}) require boolean operands, got ${left.runtimeType} and ${right.runtimeType}.',
           phase: 'Interpreter',
         ));
         return null;
       }
-      return node.operator == '&&' ? (left && right) : (left || right);
+      final result = node.operator == '&&' ? (left && right) : (left || right);
+      _log('Binary: $left ${node.operator} $right = $result');
+      return result;
     }
 
     if (node.operator == '==' || node.operator == '!=') {
-      return node.operator == '==' ? (left == right) : (left != right);
+      final result = node.operator == '==' ? (left == right) : (left != right);
+      _log('Binary: ${_formatValue(left)} ${node.operator} ${_formatValue(right)} = $result');
+      return result;
     }
 
     if (left is! num || right is! num) {
+      _log('ERROR: Operator ${node.operator} requires numeric operands');
       errors.add(CompilerError.error(
         message: 'Cannot apply operator ${node.operator} to non-numeric types (${left.runtimeType}, ${right.runtimeType}).',
         phase: 'Interpreter',
@@ -689,39 +813,49 @@ class Interpreter implements ASTVisitor<dynamic> {
 
     if (node.operator == '%') {
       if (right == 0) {
+        _log('ERROR: Modulo by zero');
         errors.add(CompilerError.error(
             message: 'Modulo by zero.',
             phase: 'Interpreter'
         ));
         return null;
       }
-      return left % right;
+      final result = left % right;
+      _log('Binary: $left % $right = $result');
+      return result;
     }
 
+    dynamic result;
     switch (node.operator) {
-      case '+': return left + right;
-      case '-': return left - right;
-      case '*': return left * right;
+      case '+': result = left + right; break;
+      case '-': result = left - right; break;
+      case '*': result = left * right; break;
       case '/':
         if (right == 0) {
+          _log('ERROR: Division by zero');
           errors.add(CompilerError.error(
               message: 'Division by zero.',
               phase: 'Interpreter'
           ));
           return null;
         }
-        return left / right;
-      case '>': return left > right;
-      case '<': return left < right;
-      case '>=': return left >= right;
-      case '<=': return left <= right;
+        result = left / right;
+        break;
+      case '>': result = left > right; break;
+      case '<': result = left < right; break;
+      case '>=': result = left >= right; break;
+      case '<=': result = left <= right; break;
       default:
+        _log('ERROR: Unsupported operator ${node.operator}');
         errors.add(CompilerError.error(
             message: 'Unsupported operator: ${node.operator}',
             phase: 'Interpreter'
         ));
         return null;
     }
+
+    _log('Binary: $left ${node.operator} $right = ${_formatValue(result)}');
+    return result;
   }
 
   @override
@@ -729,6 +863,7 @@ class Interpreter implements ASTVisitor<dynamic> {
     final operand = node.operand.accept(this);
 
     if (operand == null) {
+      _log('ERROR: Unary operator on null value');
       errors.add(CompilerError.error(
           message: 'Cannot apply unary operator to null.',
           phase: 'Interpreter'
@@ -739,23 +874,30 @@ class Interpreter implements ASTVisitor<dynamic> {
     switch (node.operator) {
       case '-':
         if (operand is! num) {
+          _log('ERROR: Unary minus requires numeric operand');
           errors.add(CompilerError.error(
               message: 'Unary minus requires a numeric operand, got ${operand.runtimeType}.',
               phase: 'Interpreter'
           ));
           return null;
         }
-        return -operand;
+        final result = -operand;
+        _log('Unary: -$operand = $result');
+        return result;
       case '!':
         if (operand is! bool) {
+          _log('ERROR: Unary NOT requires boolean operand');
           errors.add(CompilerError.error(
               message: 'Unary NOT requires a boolean operand, got ${operand.runtimeType}.',
               phase: 'Interpreter'
           ));
           return null;
         }
-        return !operand;
+        final result = !operand;
+        _log('Unary: !$operand = $result');
+        return result;
       default:
+        _log('ERROR: Unsupported unary operator ${node.operator}');
         errors.add(CompilerError.error(
             message: 'Unsupported unary operator: ${node.operator}',
             phase: 'Interpreter'
@@ -767,13 +909,16 @@ class Interpreter implements ASTVisitor<dynamic> {
   @override
   dynamic visitIdentifier(Identifier node) {
     if (!_hasVariable(node.name)) {
+      _log('ERROR: Undefined variable "${node.name}"');
       errors.add(CompilerError.error(
         message: 'Undefined variable: ${node.name}',
         phase: 'Interpreter',
       ));
       return null;
     }
-    return _getVariable(node.name);
+    final value = _getVariable(node.name);
+    _log('Access variable "${node.name}" = ${_formatValue(value)}');
+    return value;
   }
 
   @override

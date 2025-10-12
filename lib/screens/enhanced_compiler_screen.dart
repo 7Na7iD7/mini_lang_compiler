@@ -513,27 +513,158 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
     }
     return Consumer<CompilerProvider>(
       builder: (context, provider, child) {
-        return FloatingActionButton.extended(
-          onPressed: provider.isRunning ? null : () => _handleCompileAction(provider),
-          backgroundColor: provider.isRunning
-              ? Colors.grey.shade400
-              : Colors.green.shade600,
-          icon: provider.isRunning
-              ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        return MouseRegion(
+          cursor: provider.isRunning ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+          child: AnimatedScale(
+            scale: provider.isRunning ? 0.98 : 1.0,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOutCubic,
+            child: FloatingActionButton.extended(
+              onPressed: provider.isRunning ? null : () => _handleCompileAction(provider),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              highlightElevation: 0,
+              hoverElevation: 0,
+              focusElevation: 0,
+              heroTag: 'compile_fab',
+              label: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: provider.isRunning
+                      ? LinearGradient(
+                    colors: [Colors.grey.shade400, Colors.grey.shade500],
+                  )
+                      : LinearGradient(
+                    colors: [
+                      Colors.green.shade600,
+                      Colors.green.shade700,
+                      Colors.teal.shade600,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: provider.isRunning
+                      ? []
+                      : [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.5),
+                      spreadRadius: 2,
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (provider.isRunning) ...[
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Text(
+                        'در حال اجرا',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _buildAnimatedDots(),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Text(
+                        'کامپایل و اجرا',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          Icons.rocket_launch_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          )
-              : const Icon(Icons.play_arrow_rounded),
-          label: Text(
-            provider.isRunning ? 'اجرا...' : 'اجرا',
-            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          heroTag: 'compile_fab',
         );
+      },
+    );
+  }
+
+  Widget _buildAnimatedDots() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 1500),
+      builder: (context, value, child) {
+        return Row(
+          children: List.generate(3, (index) {
+            final delay = index * 0.33;
+            final animValue = (value + delay) % 1.0;
+            final opacity = animValue > 0.5 ? 1.0 : 0.3;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: opacity,
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: opacity > 0.5 ? [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.5),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ] : [],
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+      onEnd: () {
+        if (mounted) {
+          setState(() {});
+        }
       },
     );
   }
@@ -548,7 +679,7 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
       return;
     }
 
-    HapticFeedback.lightImpact();
+    HapticFeedback.mediumImpact();
 
     provider.compile();
 

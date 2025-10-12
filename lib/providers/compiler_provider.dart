@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
 import '../compiler/lexer.dart';
 import '../compiler/parser.dart';
 import '../compiler/semantic_analyzer.dart';
@@ -23,13 +22,13 @@ enum CompilerState {
 
 class CompilationPhase {
   final String name;
-  final bool isSuccessful;
+  final bool? isSuccessful;
   final String result;
   final List<String> errors;
   final List<String> warnings;
   final Duration duration;
   final Map<String, dynamic>? statistics;
-  final bool wasCached;
+  final bool? wasCached;
 
   CompilationPhase({
     required this.name,
@@ -45,8 +44,8 @@ class CompilationPhase {
   @override
   String toString() {
     final warningText = warnings.isNotEmpty ? ' (${warnings.length} warnings)' : '';
-    final cachedText = wasCached ? ' [CACHED]' : '';
-    return '$name: ${isSuccessful ? 'Success' : 'Failed'} (${duration.inMilliseconds}ms)$warningText$cachedText';
+    final cachedText = wasCached ?? false ? ' [CACHED]' : '';
+    return '$name: ${isSuccessful ?? false ? 'Success' : 'Failed'} (${duration.inMilliseconds}ms)$warningText$cachedText';
   }
 }
 
@@ -68,6 +67,8 @@ class _CompilationData {
 class _CompilationResult {
   final List<Map<String, dynamic>> tokensJson;
   final Map<String, dynamic>? astJson;
+  final Map<String, dynamic>? symbolTableJson;
+  final List<String> executionLogJson;
   final String output;
   final int executionTime;
   final List<String> lexerErrors;
@@ -85,6 +86,8 @@ class _CompilationResult {
   _CompilationResult({
     required this.tokensJson,
     required this.astJson,
+    required this.symbolTableJson,
+    required this.executionLogJson,
     required this.output,
     required this.executionTime,
     required this.lexerErrors,
@@ -108,6 +111,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   String _output = '';
   List<Token> _tokens = [];
   Program? _ast;
+  Map<String, dynamic>? _symbolTable;
+  List<String> _executionLog = [];
   bool _isRunning = false;
   bool _isCacheEnabled = true;
 
@@ -139,11 +144,14 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   String get output => _output;
   List<Token> get tokens => List.unmodifiable(_tokens);
   Program? get ast => _ast;
+  Map<String, dynamic>? get symbolTable => _symbolTable;
+  List<String> get executionLog => List.unmodifiable(_executionLog);
   Map<String, dynamic> get compilationStats => Map.unmodifiable(_compilationStats);
   List<String> get suggestions => List.unmodifiable(_suggestions);
   bool get isRunning => _isRunning;
   bool get isCacheEnabled => _isCacheEnabled;
   Map<String, dynamic> get cacheStatistics => Map.unmodifiable(_cacheStats);
+  int get executionTime => _executionTime;
 
   void setSourceCode(String value) {
     if (_sourceCode != value) {
@@ -231,6 +239,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       return _CompilationResult(
         tokensJson: [],
         astJson: null,
+        symbolTableJson: null,
+        executionLogJson: [],
         output: '',
         executionTime: 0,
         lexerErrors: lexerErrors,
@@ -268,8 +278,11 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
           'value': t.value,
           'line': t.line,
           'column': t.column,
+          'position': t.position,
         }).toList(),
         astJson: null,
+        symbolTableJson: null,
+        executionLogJson: [],
         output: '',
         executionTime: 0,
         lexerErrors: lexerErrors,
@@ -301,6 +314,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         : <String>[];
 
     final stats = analyzer.getStatistics();
+    final symbolTable = analyzer.getSymbolTableAsMap();
 
     if (analyzer.hasErrors) {
       return _CompilationResult(
@@ -309,8 +323,11 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
           'value': t.value,
           'line': t.line,
           'column': t.column,
+          'position': t.position,
         }).toList(),
         astJson: ast.toJson(),
+        symbolTableJson: symbolTable,
+        executionLogJson: [],
         output: '',
         executionTime: 0,
         lexerErrors: lexerErrors,
@@ -337,14 +354,19 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         ? interpreter.errors.map((e) => e.toString()).toList()
         : <String>[];
 
+    final executionLog = interpreter.getExecutionLog();
+
     return _CompilationResult(
       tokensJson: tokens.map((t) => {
         'type': t.type.toString(),
         'value': t.value,
         'line': t.line,
         'column': t.column,
+        'position': t.position,
       }).toList(),
       astJson: ast.toJson(),
+      symbolTableJson: symbolTable,
+      executionLogJson: executionLog,
       output: interpretResult.output,
       executionTime: interpretResult.executionTime,
       lexerErrors: lexerErrors,
@@ -403,6 +425,12 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         if (node.initialValue != null) countNodes(node.initialValue!);
       } else if (node is Assignment) {
         countNodes(node.value);
+      } else if (node is FunctionDeclaration) {
+        countNodes(node.body);
+      } else if (node is PrintStatement) {
+        countNodes(node.expression);
+      } else if (node is ReturnStatement) {
+        if (node.value != null) countNodes(node.value!);
       }
     }
 
@@ -421,6 +449,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       value: t['value'],
       line: t['line'],
       column: t['column'],
+      position: t['position'],
     )).toList();
 
     _addPhase('Lexical Analysis', result.lexerErrors.isEmpty,
@@ -455,6 +484,9 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     notifyListeners();
     await Future.delayed(Duration(milliseconds: 50));
 
+    // Store symbol table
+    _symbolTable = result.symbolTableJson;
+
     _addPhase('Semantic Analysis', result.analyzerErrors.isEmpty,
         'Symbols: ${result.stats['totalSymbols']}, Functions: ${result.stats['functions']}, Variables: ${result.stats['variables']}',
         result.analyzerErrors, warnings: result.analyzerWarnings,
@@ -488,6 +520,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
     _output = result.output;
     _executionTime = result.executionTime;
+    _executionLog = result.executionLogJson;
 
     _addPhase('Interpreting', result.interpreterErrors.isEmpty,
         _output.isEmpty ? 'No output generated' : 'Output: ${_output.split('\n').length} lines',
@@ -592,6 +625,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
     _output = interpretResult.output;
     _executionTime = interpretResult.executionTime;
+    _executionLog = interpreter.getExecutionLog();
 
     final interpreterErrors = interpreter.errors.isNotEmpty
         ? interpreter.errors.map((e) => e.toString()).toList()
@@ -659,6 +693,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     _output = '';
     _tokens.clear();
     _ast = null;
+    _symbolTable = null;
+    _executionLog.clear();
     _compilationStats.clear();
     _suggestions.clear();
     _executionTime = 0;
@@ -715,9 +751,9 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   }
 
   String getPhaseStatusIcon(CompilationPhase phase) {
-    if (phase.wasCached) {
-      return phase.isSuccessful ? '⚡' : '❌';
-    } else if (phase.isSuccessful) {
+    if (phase.wasCached ?? false) {
+      return phase.isSuccessful ?? false ? '⚡' : '❌';
+    } else if (phase.isSuccessful ?? false) {
       return phase.warnings.isEmpty ? '✅' : '⚠️';
     } else {
       return '❌';
@@ -725,9 +761,9 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   }
 
   Color getPhaseStatusColor(CompilationPhase phase) {
-    if (phase.wasCached && phase.isSuccessful) {
+    if ((phase.wasCached ?? false) && (phase.isSuccessful ?? false)) {
       return const Color(0xFF2196F3);
-    } else if (phase.isSuccessful) {
+    } else if (phase.isSuccessful ?? false) {
       return phase.warnings.isEmpty
           ? const Color(0xFF4CAF50)
           : const Color(0xFFFF9800);
@@ -742,10 +778,10 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
           _state != CompilerState.error;
 
   bool get hasOutput => _output.isNotEmpty;
-  bool get hasErrors => _phases.any((phase) => !phase.isSuccessful);
+  bool get hasErrors => _phases.any((phase) => !(phase.isSuccessful ?? true));
 
   List<String> get allErrors => _phases
-      .where((phase) => !phase.isSuccessful)
+      .where((phase) => !(phase.isSuccessful ?? true))
       .expand((phase) => phase.errors)
       .toList();
 

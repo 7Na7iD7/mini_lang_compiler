@@ -1,6 +1,56 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'dart:math' as math;
 import 'code_intelligence.dart';
+
+class ModernOverlayTheme {
+  static const double borderRadius = 16.0;
+  static const double smallRadius = 8.0;
+  static const double blurStrength = 15.0;
+
+  static final primaryGradient = [
+    Color(0xFF667eea),
+    Color(0xFF764ba2),
+  ];
+
+  static final accentGradient = [
+    Color(0xFFf093fb),
+    Color(0xFFf5576c),
+  ];
+
+  static final darkGradient = [
+    Color(0xFF1a1a2e).withOpacity(0.95),
+    Color(0xFF16213e).withOpacity(0.92),
+  ];
+
+  static BoxDecoration premiumGlassDecoration(Color accentColor) {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: darkGradient,
+      ),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(
+        width: 1.5,
+        color: Colors.white.withOpacity(0.2),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: accentColor.withOpacity(0.3),
+          blurRadius: 30,
+          spreadRadius: -5,
+          offset: Offset(0, 10),
+        ),
+        BoxShadow(
+          color: Colors.black.withOpacity(0.5),
+          blurRadius: 25,
+          offset: Offset(0, 15),
+        ),
+      ],
+    );
+  }
+}
 
 class AutoCompleteOverlay extends StatefulWidget {
   final LayerLink layerLink;
@@ -23,40 +73,42 @@ class AutoCompleteOverlay extends StatefulWidget {
 }
 
 class _AutoCompleteOverlayState extends State<AutoCompleteOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
-  late Animation<Offset> _slideAnimation;
+    with TickerProviderStateMixin {
+  late AnimationController _mainController;
+  late AnimationController _shimmerController;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _fadeAnim;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 250),
+
+    _mainController = AnimationController(
+      duration: Duration(milliseconds: 400),
       vsync: this,
     );
 
-    _scaleAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
+    _shimmerController = AnimationController(
+      duration: Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+
+    _scaleAnim = CurvedAnimation(
+      parent: _mainController,
+      curve: Curves.elasticOut,
     );
 
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _mainController, curve: Curves.easeOut),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -10),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-
-    _controller.forward();
+    _mainController.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _mainController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -66,70 +118,35 @@ class _AutoCompleteOverlayState extends State<AutoCompleteOverlay>
       link: widget.layerLink,
       targetAnchor: Alignment.bottomLeft,
       followerAnchor: Alignment.topLeft,
-      offset: Offset(68, widget.currentLine * 19.6 + 16),
+      offset: Offset(68, widget.currentLine * 19.6 + 20),
       child: FadeTransition(
-        opacity: _opacityAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            alignment: Alignment.topLeft,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: _buildGlassmorphicContainer(),
-            ),
-          ),
+        opacity: _fadeAnim,
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          alignment: Alignment.topLeft,
+          child: _buildPremiumContainer(),
         ),
       ),
     );
   }
 
-  Widget _buildGlassmorphicContainer() {
+  Widget _buildPremiumContainer() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(ModernOverlayTheme.borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(
+          sigmaX: ModernOverlayTheme.blurStrength,
+          sigmaY: ModernOverlayTheme.blurStrength,
+        ),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 420, maxHeight: 320),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF2B2B2B).withOpacity(0.9),
-                const Color(0xFF1E1E1E).withOpacity(0.85),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.15),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+          constraints: BoxConstraints(maxWidth: 450, maxHeight: 380),
+          decoration: ModernOverlayTheme.premiumGlassDecoration(Colors.purple),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildEnhancedHeader(),
-              Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.white.withOpacity(0.1),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-              _buildCompletionList(),
+              _buildModernHeader(),
+              _buildShimmerDivider(),
+              _buildCompletionsList(),
             ],
           ),
         ),
@@ -137,42 +154,85 @@ class _AutoCompleteOverlayState extends State<AutoCompleteOverlay>
     );
   }
 
-  Widget _buildEnhancedHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
+  Widget _buildModernHeader() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.purple.withOpacity(0.2),
+            Colors.blue.withOpacity(0.15),
+          ],
+        ),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(ModernOverlayTheme.borderRadius),
+          topRight: Radius.circular(ModernOverlayTheme.borderRadius),
+        ),
+      ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(6),
+              gradient: LinearGradient(
+                colors: ModernOverlayTheme.primaryGradient,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.purple.withOpacity(0.5),
+                  blurRadius: 12,
+                  spreadRadius: -2,
+                ),
+              ],
             ),
-            child: const Icon(Icons.auto_awesome, size: 16, color: Colors.amber),
+            child: Icon(Icons.auto_awesome, size: 20, color: Colors.white),
           ),
-          const SizedBox(width: 10),
-          Text(
-            'Smart Suggestions',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI Suggestions',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Context-aware completions',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ),
-          const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade400, Colors.cyan.shade400],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.4),
+                  blurRadius: 8,
+                  spreadRadius: -2,
+                ),
+              ],
             ),
             child: Text(
               '${widget.completions.length}',
-              style: const TextStyle(
-                color: Colors.blue,
-                fontSize: 11,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -182,39 +242,55 @@ class _AutoCompleteOverlayState extends State<AutoCompleteOverlay>
     );
   }
 
-  Widget _buildCompletionList() {
+  Widget _buildShimmerDivider() {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        return Container(
+          height: 2,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              stops: [
+                _shimmerController.value - 0.3,
+                _shimmerController.value,
+                _shimmerController.value + 0.3,
+              ].map((e) => e.clamp(0.0, 1.0)).toList(),
+              colors: [
+                Colors.transparent,
+                Colors.purple.withOpacity(0.5),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompletionsList() {
     return Flexible(
       child: ListView.builder(
         shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: EdgeInsets.all(8),
         itemCount: widget.completions.length,
         itemBuilder: (context, index) {
-          return AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final delay = index * 0.03;
-              final itemAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-                CurvedAnimation(
-                  parent: _controller,
-                  curve: Interval(delay, 1.0, curve: Curves.easeOut),
-                ),
-              );
-
-              return FadeTransition(
-                opacity: itemAnimation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(-0.2, 0),
-                    end: Offset.zero,
-                  ).animate(itemAnimation),
-                  child: child,
-                ),
+          return TweenAnimationBuilder<double>(
+            duration: Duration(milliseconds: 300 + (index * 50)),
+            tween: Tween(begin: 0.0, end: 1.0),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Transform.translate(
+                offset: Offset(-20 * (1 - value), 0),
+                child: Opacity(opacity: value, child: child),
               );
             },
-            child: _CompletionListItem(
+            child: _ModernCompletionItem(
               completion: widget.completions[index],
               isSelected: index == widget.selectedIndex,
               onTap: () => widget.onSelect(widget.completions[index]),
+              index: index,
             ),
           );
         },
@@ -223,79 +299,125 @@ class _AutoCompleteOverlayState extends State<AutoCompleteOverlay>
   }
 }
 
-class _CompletionListItem extends StatefulWidget {
+class _ModernCompletionItem extends StatefulWidget {
   final CompletionItem completion;
   final bool isSelected;
   final VoidCallback onTap;
+  final int index;
 
-  const _CompletionListItem({
+  const _ModernCompletionItem({
     required this.completion,
     required this.isSelected,
     required this.onTap,
+    required this.index,
   });
 
   @override
-  State<_CompletionListItem> createState() => _CompletionListItemState();
+  State<_ModernCompletionItem> createState() => _ModernCompletionItemState();
 }
 
-class _CompletionListItemState extends State<_CompletionListItem> {
+class _ModernCompletionItemState extends State<_ModernCompletionItem>
+    with SingleTickerProviderStateMixin {
   bool _isHovering = false;
+  late AnimationController _hoverController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hoverController = AnimationController(
+      duration: Duration(milliseconds: 200),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _hoverController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isSelected || _isHovering) {
+      _hoverController.forward();
+    } else {
+      _hoverController.reverse();
+    }
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: widget.isSelected
-                ? LinearGradient(
-              colors: [
-                Colors.blue.withOpacity(0.3),
-                Colors.blue.withOpacity(0.2),
-              ],
-            )
-                : _isHovering
-                ? LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.05),
-                Colors.white.withOpacity(0.02),
-              ],
-            )
-                : null,
-            borderRadius: BorderRadius.circular(8),
-            border: widget.isSelected
-                ? Border.all(color: Colors.blue.withOpacity(0.5), width: 1)
-                : null,
-          ),
-          child: Row(
-            children: [
-              _buildIcon(),
-              const SizedBox(width: 12),
-              Expanded(child: _buildContent()),
-              if (widget.completion.score > 0.8) _buildBestBadge(),
-            ],
-          ),
+        child: AnimatedBuilder(
+          animation: _hoverController,
+          builder: (context, child) {
+            return Container(
+              margin: EdgeInsets.symmetric(vertical: 3),
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: widget.isSelected
+                    ? LinearGradient(
+                  colors: [
+                    Colors.purple.withOpacity(0.4),
+                    Colors.blue.withOpacity(0.3),
+                  ],
+                )
+                    : LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.05 * _hoverController.value),
+                    Colors.white.withOpacity(0.02 * _hoverController.value),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(ModernOverlayTheme.smallRadius),
+                border: widget.isSelected
+                    ? Border.all(color: Colors.purple.withOpacity(0.6), width: 1.5)
+                    : null,
+                boxShadow: widget.isSelected
+                    ? [
+                  BoxShadow(
+                    color: Colors.purple.withOpacity(0.3),
+                    blurRadius: 12,
+                    spreadRadius: -2,
+                  ),
+                ]
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  _buildIconBadge(),
+                  SizedBox(width: 12),
+                  Expanded(child: _buildContent()),
+                  if (widget.completion.score > 0.8) _buildBestBadge(),
+                  if (widget.isSelected) _buildSelectedArrow(),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildIcon() {
+  Widget _buildIconBadge() {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: widget.completion.color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(6),
+        gradient: LinearGradient(
+          colors: [
+            widget.completion.color.withOpacity(0.3),
+            widget.completion.color.withOpacity(0.2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: widget.completion.color.withOpacity(0.4),
+          width: 1,
+        ),
       ),
       child: Icon(
         widget.completion.icon,
-        size: 16,
+        size: 18,
         color: widget.completion.color,
       ),
     );
@@ -307,7 +429,7 @@ class _CompletionListItemState extends State<_CompletionListItem> {
       children: [
         Text(
           widget.completion.label,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontFamily: 'Courier New',
             fontSize: 14,
@@ -315,7 +437,7 @@ class _CompletionListItemState extends State<_CompletionListItem> {
           ),
         ),
         if (widget.completion.detail.isNotEmpty) ...[
-          const SizedBox(height: 2),
+          SizedBox(height: 3),
           Text(
             widget.completion.detail,
             style: TextStyle(
@@ -333,28 +455,45 @@ class _CompletionListItemState extends State<_CompletionListItem> {
 
   Widget _buildBestBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.amber.withOpacity(0.3), Colors.amber.withOpacity(0.2)],
+          colors: [Colors.amber.shade300, Colors.orange.shade400],
         ),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.amber.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.5),
+            blurRadius: 8,
+            spreadRadius: -2,
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.star, size: 10, color: Colors.amber),
-          SizedBox(width: 3),
+        children: [
+          Icon(Icons.stars, size: 12, color: Colors.white),
+          SizedBox(width: 4),
           Text(
             'Best',
             style: TextStyle(
-              color: Colors.amber,
-              fontSize: 9,
+              color: Colors.white,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedArrow() {
+    return Container(
+      margin: EdgeInsets.only(left: 8),
+      child: Icon(
+        Icons.arrow_forward_rounded,
+        size: 18,
+        color: Colors.purple.shade300,
       ),
     );
   }
@@ -379,24 +518,14 @@ class SignatureHelpOverlay extends StatefulWidget {
 class _SignatureHelpOverlayState extends State<SignatureHelpOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: Duration(milliseconds: 350),
       vsync: this,
-    );
-
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 5),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-
-    _controller.forward();
+    )..forward();
   }
 
   @override
@@ -407,7 +536,7 @@ class _SignatureHelpOverlayState extends State<SignatureHelpOverlay>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.signatureHelp == null) return const SizedBox.shrink();
+    if (widget.signatureHelp == null) return SizedBox.shrink();
 
     final signature = widget.signatureHelp!
         .signatures[widget.signatureHelp!.activeSignature];
@@ -416,15 +545,13 @@ class _SignatureHelpOverlayState extends State<SignatureHelpOverlay>
       link: widget.layerLink,
       targetAnchor: Alignment.topLeft,
       followerAnchor: Alignment.bottomLeft,
-      offset: Offset(68, (widget.currentLine - 1) * 19.6),
+      offset: Offset(68, (widget.currentLine - 1) * 19.6 - 8),
       child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: _buildSignatureContainer(signature),
-          ),
+        opacity: _controller,
+        child: ScaleTransition(
+          scale: CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+          alignment: Alignment.bottomLeft,
+          child: _buildSignatureContainer(signature),
         ),
       ),
     );
@@ -432,39 +559,24 @@ class _SignatureHelpOverlayState extends State<SignatureHelpOverlay>
 
   Widget _buildSignatureContainer(FunctionSignature signature) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(ModernOverlayTheme.borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(
+          sigmaX: ModernOverlayTheme.blurStrength,
+          sigmaY: ModernOverlayTheme.blurStrength,
+        ),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 520),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF2B2B2B).withOpacity(0.95),
-                const Color(0xFF1E1E1E).withOpacity(0.9),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.withOpacity(0.4), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+          constraints: BoxConstraints(maxWidth: 550),
+          padding: EdgeInsets.all(16),
+          decoration: ModernOverlayTheme.premiumGlassDecoration(Colors.cyan),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSignatureHeader(signature),
+              _buildHeader(signature),
               if (signature.parameters.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                ..._buildParameterList(signature.parameters),
+                SizedBox(height: 12),
+                ..._buildParameters(signature.parameters),
               ],
             ],
           ),
@@ -473,25 +585,34 @@ class _SignatureHelpOverlayState extends State<SignatureHelpOverlay>
     );
   }
 
-  Widget _buildSignatureHeader(FunctionSignature signature) {
+  Widget _buildHeader(FunctionSignature signature) {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(6),
+            gradient: LinearGradient(
+              colors: [Colors.cyan.shade400, Colors.blue.shade500],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.cyan.withOpacity(0.5),
+                blurRadius: 12,
+                spreadRadius: -2,
+              ),
+            ],
           ),
-          child: const Icon(Icons.functions_rounded, size: 16, color: Colors.blue),
+          child: Icon(Icons.functions_rounded, size: 18, color: Colors.white),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 12),
         Expanded(
           child: Text(
             signature.displayText,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
               fontFamily: 'Courier New',
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -500,193 +621,65 @@ class _SignatureHelpOverlayState extends State<SignatureHelpOverlay>
     );
   }
 
-  List<Widget> _buildParameterList(List<String> parameters) {
+  List<Widget> _buildParameters(List<String> parameters) {
     return parameters.asMap().entries.map((entry) {
-      final index = entry.key;
-      final param = entry.value;
-      final isActive = index == widget.signatureHelp!.activeParameter;
-
-      return _ParameterItem(parameter: param, isActive: isActive);
+      final isActive = entry.key == widget.signatureHelp!.activeParameter;
+      return _buildParameterItem(entry.value, isActive, entry.key);
     }).toList();
   }
-}
 
-class _ParameterItem extends StatelessWidget {
-  final String parameter;
-  final bool isActive;
-
-  const _ParameterItem({
-    required this.parameter,
-    required this.isActive,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 24, top: 6),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  Widget _buildParameterItem(String param, bool isActive, int index) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 200 + (index * 50)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(-10 * (1 - value), 0),
+          child: Opacity(opacity: value, child: child),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(top: 8, left: 32),
+        padding: EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.blue.withOpacity(0.15) : null,
-          borderRadius: BorderRadius.circular(6),
+          gradient: isActive
+              ? LinearGradient(
+            colors: [
+              Colors.cyan.withOpacity(0.3),
+              Colors.blue.withOpacity(0.2),
+            ],
+          )
+              : null,
+          borderRadius: BorderRadius.circular(ModernOverlayTheme.smallRadius),
           border: isActive
-              ? Border.all(color: Colors.blue.withOpacity(0.3))
+              ? Border.all(color: Colors.cyan.withOpacity(0.5), width: 1.5)
               : null,
         ),
         child: Row(
           children: [
-            Icon(
-              isActive ? Icons.arrow_right : Icons.circle,
-              size: isActive ? 16 : 6,
-              color: isActive ? Colors.blue : Colors.white.withOpacity(0.3),
+            Container(
+              padding: EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isActive ? Colors.cyan.withOpacity(0.3) : Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isActive ? Icons.play_arrow : Icons.circle,
+                size: isActive ? 14 : 8,
+                color: isActive ? Colors.cyan.shade300 : Colors.white.withOpacity(0.4),
+              ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 10),
             Text(
-              parameter,
+              param,
               style: TextStyle(
-                color: isActive ? Colors.blue : Colors.white.withOpacity(0.7),
+                color: isActive ? Colors.cyan.shade200 : Colors.white.withOpacity(0.7),
                 fontFamily: 'Courier New',
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class HoverInfoOverlay extends StatefulWidget {
-  final LayerLink layerLink;
-  final Offset position;
-  final String title;
-  final String description;
-  final IconData? icon;
-
-  const HoverInfoOverlay({
-    super.key,
-    required this.layerLink,
-    required this.position,
-    required this.title,
-    required this.description,
-    this.icon,
-  });
-
-  @override
-  State<HoverInfoOverlay> createState() => _HoverInfoOverlayState();
-}
-
-class _HoverInfoOverlayState extends State<HoverInfoOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CompositedTransformFollower(
-      link: widget.layerLink,
-      targetAnchor: Alignment.topLeft,
-      followerAnchor: Alignment.bottomLeft,
-      offset: widget.position,
-      child: FadeTransition(
-        opacity: _controller,
-        child: ScaleTransition(
-          scale: CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-          alignment: Alignment.bottomLeft,
-          child: _buildInfoContainer(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoContainer() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 420),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF2B2B2B).withOpacity(0.95),
-                const Color(0xFF1E1E1E).withOpacity(0.9),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withOpacity(0.4), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (widget.icon != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(widget.icon, size: 16, color: Colors.blue),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'Courier New',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (widget.description.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  widget.description,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontFamily: 'Courier New',
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );
@@ -719,10 +712,9 @@ class _ErrorTooltipOverlayState extends State<ErrorTooltipOverlay>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: Duration(milliseconds: 400),
       vsync: this,
-    );
-    _controller.forward();
+    )..forward();
   }
 
   @override
@@ -751,28 +743,28 @@ class _ErrorTooltipOverlayState extends State<ErrorTooltipOverlay>
 
   Widget _buildErrorContainer() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(ModernOverlayTheme.borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(
+          sigmaX: ModernOverlayTheme.blurStrength,
+          sigmaY: ModernOverlayTheme.blurStrength,
+        ),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 380),
-          padding: const EdgeInsets.all(14),
+          constraints: BoxConstraints(maxWidth: 400),
+          padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF2B2B2B).withOpacity(0.95),
-                const Color(0xFF1E1E1E).withOpacity(0.9),
-              ],
+              colors: ModernOverlayTheme.darkGradient,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(ModernOverlayTheme.borderRadius),
             border: Border.all(color: Colors.red.withOpacity(0.6), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.red.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+                color: Colors.red.withOpacity(0.4),
+                blurRadius: 25,
+                spreadRadius: -5,
               ),
             ],
           ),
@@ -783,53 +775,62 @@ class _ErrorTooltipOverlayState extends State<ErrorTooltipOverlay>
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(6),
+                      gradient: LinearGradient(
+                        colors: [Colors.red.shade400, Colors.pink.shade400],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.5),
+                          blurRadius: 10,
+                          spreadRadius: -2,
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.error_outline, size: 16, color: Colors.red),
+                    child: Icon(Icons.error_outline, size: 18, color: Colors.white),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       widget.errorMessage,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontFamily: 'Courier New',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ],
               ),
               if (widget.suggestion != null) ...[
-                const SizedBox(height: 10),
+                SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.blue.withOpacity(0.15),
-                        Colors.blue.withOpacity(0.1),
+                        Colors.blue.withOpacity(0.2),
+                        Colors.cyan.withOpacity(0.15),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(ModernOverlayTheme.smallRadius),
+                    border: Border.all(color: Colors.blue.withOpacity(0.4)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.lightbulb, size: 14, color: Colors.blue),
-                      const SizedBox(width: 8),
+                      Icon(Icons.tips_and_updates, size: 16, color: Colors.cyan.shade300),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           widget.suggestion!,
                           style: TextStyle(
-                            color: Colors.blue.shade200,
+                            color: Colors.cyan.shade200,
                             fontFamily: 'Courier New',
-                            fontSize: 11,
-                            height: 1.3,
+                            fontSize: 12,
+                            height: 1.4,
                           ),
                         ),
                       ),

@@ -90,8 +90,8 @@ class AdvancedCodeFoldingManager {
 
   void _findFunctionRegions(List<String> lines) {
     final patterns = [
-      RegExp(r'^\s*(void|int|String|double|bool|var|dynamic|Future|Stream)?\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{?\s*$'),
-      RegExp(r'^\s*(public|private|protected)?\s*func\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{?'),
+      RegExp(r'^\s*(void|int|String|double|bool|var|dynamic|Future|Stream)?\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{?\s*'),
+          RegExp(r'^\s*(public|private|protected)?\s*func\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{?'),
       RegExp(r'^\s*def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*:'),
       RegExp(r'^\s*function\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{'),
     ];
@@ -838,7 +838,6 @@ class _AdvancedFoldingGutterState extends State<AdvancedFoldingGutter>
       isCollapsed ? 1.0 : 0.0,
     );
 
-    // Add tooltip
     if (isHovered && region.metadata.preview != null) {
       return Tooltip(
         message: '${region.displayText}\n'

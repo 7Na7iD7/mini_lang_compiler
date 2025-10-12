@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/compiler_provider.dart';
+import 'comprehensive_compiler_viewer.dart';
 
 class PhaseColors {
   static const success = Color(0xFF10B981);
@@ -84,6 +85,16 @@ class _CompilationPhasesState extends State<CompilationPhases>
     });
   }
 
+  void _showPhaseDetails(BuildContext context, CompilerProvider provider) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ComprehensiveCompilerViewer(
+          sourceCode: provider.sourceCode ?? '',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<CompilerProvider>(
@@ -93,7 +104,7 @@ class _CompilationPhasesState extends State<CompilationPhases>
         return Card(
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: Theme.of(context).colorScheme.outline.withOpacity(0.12),
               width: 1,
@@ -108,6 +119,9 @@ class _CompilationPhasesState extends State<CompilationPhases>
                 hasPhases: provider.phases.isNotEmpty,
                 expandAll: _expandAll,
                 onToggleExpandAll: _toggleExpandAll,
+                onShowDetailsAll: provider.phases.isNotEmpty
+                    ? () => _showPhaseDetails(context, provider)
+                    : null,
               ),
               if (provider.isCompiling)
                 _ProgressBar(controller: _progressController),
@@ -144,6 +158,13 @@ class _CompilationPhasesState extends State<CompilationPhases>
       _progressController.value = 0;
     }
   }
+
+  Color _getPhaseColor(CompilationPhase phase, ThemeData theme) {
+    if ((phase.wasCached ?? false) && (phase.isSuccessful ?? false)) {
+      return PhaseColors.cached;
+    }
+    return (phase.isSuccessful ?? false) ? PhaseColors.success : PhaseColors.error;
+  }
 }
 
 class _PhasesHeader extends StatelessWidget {
@@ -152,6 +173,7 @@ class _PhasesHeader extends StatelessWidget {
   final bool hasPhases;
   final bool expandAll;
   final VoidCallback onToggleExpandAll;
+  final VoidCallback? onShowDetailsAll;
 
   const _PhasesHeader({
     required this.isRunning,
@@ -159,14 +181,17 @@ class _PhasesHeader extends StatelessWidget {
     required this.hasPhases,
     required this.expandAll,
     required this.onToggleExpandAll,
+    this.onShowDetailsAll,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -177,116 +202,145 @@ class _PhasesHeader extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primary.withOpacity(0.8),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              size: 20,
-              color: theme.colorScheme.onPrimary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Compilation Pipeline',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                    letterSpacing: -0.5,
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isSmallScreen ? 8 : 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.primary.withOpacity(0.8),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Build process visualization',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (hasPhases && !isRunning) ...[
-            _ExpandAllButton(
-              expanded: expandAll,
-              onTap: onToggleExpandAll,
-            ),
-            const SizedBox(width: 12),
-          ],
-          if (isRunning)
-            AnimatedBuilder(
-              animation: pulseController,
-              builder: (context, child) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        theme.colorScheme.primary.withOpacity(0.15 + pulseController.value * 0.1),
-                        theme.colorScheme.primary.withOpacity(0.1 + pulseController.value * 0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
                       color: theme.colorScheme.primary.withOpacity(0.3),
-                      width: 1,
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation(
-                            theme.colorScheme.primary,
-                          ),
-                        ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: isSmallScreen ? 16 : 18,
+                  color: theme.colorScheme.onPrimary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Compilation Pipeline',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                        fontSize: isSmallScreen ? 13 : 14,
                       ),
-                      const SizedBox(width: 10),
+                    ),
+                    if (!isSmallScreen) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        'Processing',
+                        'Build process visualization',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
-                          fontSize: 13,
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          fontSize: 11,
                         ),
                       ),
                     ],
+                  ],
+                ),
+              ),
+              if (isRunning)
+                AnimatedBuilder(
+                  animation: pulseController,
+                  builder: (context, child) {
+                    return Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 10 : 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary.withOpacity(0.15 + pulseController.value * 0.1),
+                            theme.colorScheme.primary.withOpacity(0.1 + pulseController.value * 0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(
+                                theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Processing',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+          if (hasPhases && !isRunning) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onShowDetailsAll,
+                    icon: const Icon(Icons.visibility_rounded, size: 16),
+                    label: Text(
+                      'View Details',
+                      style: TextStyle(fontSize: isSmallScreen ? 11 : 12),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
-                );
-              },
+                ),
+                const SizedBox(width: 8),
+                _ExpandAllButton(
+                  expanded: expandAll,
+                  onTap: onToggleExpandAll,
+                ),
+              ],
             ),
+          ],
         ],
       ),
     );
@@ -312,7 +366,7 @@ class _ExpandAllButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
             borderRadius: BorderRadius.circular(8),
@@ -320,24 +374,10 @@ class _ExpandAllButton extends StatelessWidget {
               color: theme.colorScheme.outline.withOpacity(0.2),
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                expanded ? Icons.unfold_less : Icons.unfold_more,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                expanded ? 'Collapse' : 'Expand',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+          child: Icon(
+            expanded ? Icons.unfold_less : Icons.unfold_more,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -395,9 +435,9 @@ class _PhasesBody extends StatelessWidget {
 
     return ListView.separated(
       controller: scrollController,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(12),
       itemCount: provider.phases.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         onEnsureController(index);
 
@@ -429,7 +469,7 @@ class _EmptyState extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -441,22 +481,22 @@ class _EmptyState extends StatelessWidget {
             ),
             child: Icon(
               Icons.rocket_launch_rounded,
-              size: 64,
+              size: 48,
               color: theme.colorScheme.primary.withOpacity(0.7),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Text(
             'Ready to Compile',
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: theme.colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            'Click "Compile & Run" to see the magic happen',
-            style: theme.textTheme.bodyMedium?.copyWith(
+            'Click "Compile & Run" to start',
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
             textAlign: TextAlign.center,
@@ -529,85 +569,72 @@ class _PhaseItemState extends State<_PhaseItem> {
 
   Widget _buildPhaseContent(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        transform: Matrix4.identity()
-          ..translate(0.0, _isHovered ? -2.0 : 0.0),
-        decoration: BoxDecoration(
-          color: _getPhaseBackgroundColor(widget.phase, theme),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _getPhaseColor(widget.phase, theme).withOpacity(
-              _isHovered ? 0.5 : 0.3,
-            ),
-            width: _isHovered ? 2 : 1,
-          ),
-          boxShadow: _isHovered ? [
-            BoxShadow(
-              color: _getPhaseColor(widget.phase, theme).withOpacity(0.1),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ] : null,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        color: _getPhaseBackgroundColor(widget.phase, theme),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _getPhaseColor(widget.phase, theme).withOpacity(0.3),
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onToggle,
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildPhaseHeader(context),
-                      const SizedBox(height: 12),
-                      _buildPhaseResultSummary(context),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (widget.isExpanded) ...[
-              Divider(
-                height: 1,
-                color: _getPhaseColor(widget.phase, theme).withOpacity(0.2),
-                indent: 20,
-                endIndent: 20,
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onToggle,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: EdgeInsets.all(isSmallScreen ? 12 : 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildDetailedPhaseInfo(context),
-                    if (widget.phase.errors.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildPhaseErrors(context),
-                    ],
-                    if (widget.phase.warnings.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _buildPhaseWarnings(context),
-                    ],
+                    _buildPhaseHeader(context, isSmallScreen),
+                    const SizedBox(height: 8),
+                    _buildPhaseResultSummary(context, isSmallScreen),
                   ],
                 ),
               ),
-            ],
+            ),
+          ),
+          if (widget.isExpanded) ...[
+            Divider(
+              height: 1,
+              color: _getPhaseColor(widget.phase, theme).withOpacity(0.2),
+              indent: 12,
+              endIndent: 12,
+            ),
+            Padding(
+              padding: EdgeInsets.all(isSmallScreen ? 12 : 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailedPhaseInfo(context, isSmallScreen),
+                  if (widget.phase.errors.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildPhaseErrors(context, isSmallScreen),
+                  ],
+                  if (widget.phase.warnings.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildPhaseWarnings(context, isSmallScreen),
+                  ],
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildPhaseHeader(BuildContext context) {
+  Widget _buildPhaseHeader(BuildContext context, bool isSmallScreen) {
     final theme = Theme.of(context);
 
     return Row(
@@ -616,7 +643,7 @@ class _PhaseItemState extends State<_PhaseItem> {
           isSuccessful: widget.phase.isSuccessful ?? false,
           wasCached: widget.phase.wasCached ?? false,
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,27 +652,27 @@ class _PhaseItemState extends State<_PhaseItem> {
                 children: [
                   Icon(
                     _getPhaseHeaderIcon(widget.phase.name),
-                    size: 18,
+                    size: 14,
                     color: _getPhaseColor(widget.phase, theme),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       widget.phase.name,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,
-                        fontSize: 15,
+                        fontSize: isSmallScreen ? 12 : 13,
                       ),
                     ),
                   ),
                   if (widget.phase.wasCached ?? false) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: PhaseColors.cached.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(4),
                         border: Border.all(
                           color: PhaseColors.cached.withOpacity(0.3),
                         ),
@@ -655,14 +682,14 @@ class _PhaseItemState extends State<_PhaseItem> {
                         children: [
                           Icon(
                             Icons.flash_on,
-                            size: 12,
+                            size: 10,
                             color: PhaseColors.cached,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 3),
                           Text(
-                            'CACHED',
+                            'CACHE',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 8,
                               fontWeight: FontWeight.bold,
                               color: PhaseColors.cached,
                               letterSpacing: 0.5,
@@ -677,40 +704,40 @@ class _PhaseItemState extends State<_PhaseItem> {
             ],
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.schedule_rounded,
-                size: 14,
+                size: 11,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Text(
                 '${widget.phase.duration.inMilliseconds}ms',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 12,
+                  fontSize: 10,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         AnimatedRotation(
           turns: widget.isExpanded ? 0.5 : 0,
           duration: const Duration(milliseconds: 200),
           child: Icon(
             Icons.keyboard_arrow_down_rounded,
-            size: 24,
+            size: 20,
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
@@ -718,17 +745,17 @@ class _PhaseItemState extends State<_PhaseItem> {
     );
   }
 
-  Widget _buildPhaseResultSummary(BuildContext context) {
+  Widget _buildPhaseResultSummary(BuildContext context, bool isSmallScreen) {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(left: 50),
+      padding: const EdgeInsets.only(left: 44),
       child: Text(
         widget.phase.result,
         style: theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurface.withOpacity(0.7),
-          height: 1.5,
-          fontSize: 13,
+          height: 1.4,
+          fontSize: isSmallScreen ? 11 : 12,
         ),
         maxLines: widget.isExpanded ? null : 2,
         overflow: widget.isExpanded ? null : TextOverflow.ellipsis,
@@ -736,7 +763,7 @@ class _PhaseItemState extends State<_PhaseItem> {
     );
   }
 
-  Widget _buildDetailedPhaseInfo(BuildContext context) {
+  Widget _buildDetailedPhaseInfo(BuildContext context, bool isSmallScreen) {
     final theme = Theme.of(context);
     final details = _extractPhaseDetails(widget.phase.name, widget.phase.result);
 
@@ -745,10 +772,10 @@ class _PhaseItemState extends State<_PhaseItem> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: theme.colorScheme.outline.withOpacity(0.15),
         ),
@@ -760,37 +787,37 @@ class _PhaseItemState extends State<_PhaseItem> {
             children: [
               Icon(
                 Icons.analytics_outlined,
-                size: 16,
+                size: 14,
                 color: PhaseColors.info,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 'Phase Details',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: PhaseColors.info,
-                  fontSize: 13,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           ...details.entries.map((entry) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    width: 6,
-                    height: 6,
+                    margin: const EdgeInsets.only(top: 5),
+                    width: 4,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: PhaseColors.info,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
                       text: TextSpan(
@@ -800,6 +827,7 @@ class _PhaseItemState extends State<_PhaseItem> {
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: theme.colorScheme.onSurface,
+                              fontSize: 10,
                             ),
                           ),
                           TextSpan(
@@ -807,6 +835,7 @@ class _PhaseItemState extends State<_PhaseItem> {
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurface.withOpacity(0.8),
                               fontFamily: 'monospace',
+                              fontSize: 10,
                             ),
                           ),
                         ],
@@ -834,7 +863,6 @@ class _PhaseItemState extends State<_PhaseItem> {
     } else if (phaseName.toLowerCase().contains('pars')) {
       final nodesMatch = RegExp(r'(\d+)\s+nodes').firstMatch(result);
       if (nodesMatch != null) details['AST Nodes'] = nodesMatch.group(1)!;
-      details['Structure'] = 'Parse Tree';
     } else if (phaseName.toLowerCase().contains('semantic')) {
       final symbolsMatch = RegExp(r'Symbols:\s*(\d+)').firstMatch(result);
       final functionsMatch = RegExp(r'Functions:\s*(\d+)').firstMatch(result);
@@ -846,20 +874,19 @@ class _PhaseItemState extends State<_PhaseItem> {
     } else if (phaseName.toLowerCase().contains('interpret') || phaseName.toLowerCase().contains('execut')) {
       final linesMatch = RegExp(r'(\d+)\s+lines').firstMatch(result);
       if (linesMatch != null) details['Output Lines'] = linesMatch.group(1)!;
-      details['Status'] = (widget.phase.isSuccessful ?? false) ? 'Success' : 'Failed';
     }
 
     return details;
   }
 
-  Widget _buildPhaseErrors(BuildContext context) {
+  Widget _buildPhaseErrors(BuildContext context, bool isSmallScreen) {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
       decoration: BoxDecoration(
         color: PhaseColors.error.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: PhaseColors.error.withOpacity(0.3),
         ),
@@ -871,45 +898,45 @@ class _PhaseItemState extends State<_PhaseItem> {
             children: [
               Icon(
                 Icons.error_outline_rounded,
-                size: 18,
+                size: 14,
                 color: PhaseColors.error,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 'Errors (${widget.phase.errors.length})',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: PhaseColors.error,
-                  fontSize: 13,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           ...widget.phase.errors.asMap().entries.map((entry) {
             return Padding(
-              padding: EdgeInsets.only(top: entry.key > 0 ? 8 : 0),
+              padding: EdgeInsets.only(top: entry.key > 0 ? 6 : 0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    margin: const EdgeInsets.only(top: 5),
-                    width: 5,
-                    height: 5,
+                    margin: const EdgeInsets.only(top: 4),
+                    width: 4,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: PhaseColors.error,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       entry.value,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: PhaseColors.error.withOpacity(0.9),
                         fontFamily: 'monospace',
-                        height: 1.5,
-                        fontSize: 12,
+                        height: 1.4,
+                        fontSize: isSmallScreen ? 10 : 11,
                       ),
                     ),
                   ),
@@ -922,14 +949,14 @@ class _PhaseItemState extends State<_PhaseItem> {
     );
   }
 
-  Widget _buildPhaseWarnings(BuildContext context) {
+  Widget _buildPhaseWarnings(BuildContext context, bool isSmallScreen) {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
       decoration: BoxDecoration(
         color: PhaseColors.warning.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: PhaseColors.warning.withOpacity(0.3),
         ),
@@ -941,45 +968,45 @@ class _PhaseItemState extends State<_PhaseItem> {
             children: [
               Icon(
                 Icons.warning_amber_rounded,
-                size: 18,
+                size: 14,
                 color: PhaseColors.warning,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 'Warnings (${widget.phase.warnings.length})',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: PhaseColors.warning,
-                  fontSize: 13,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           ...widget.phase.warnings.asMap().entries.map((entry) {
             return Padding(
-              padding: EdgeInsets.only(top: entry.key > 0 ? 8 : 0),
+              padding: EdgeInsets.only(top: entry.key > 0 ? 6 : 0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    margin: const EdgeInsets.only(top: 5),
-                    width: 5,
-                    height: 5,
+                    margin: const EdgeInsets.only(top: 4),
+                    width: 4,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: PhaseColors.warning,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       entry.value,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: PhaseColors.warning.withOpacity(0.9),
                         fontFamily: 'monospace',
-                        height: 1.5,
-                        fontSize: 12,
+                        height: 1.4,
+                        fontSize: isSmallScreen ? 10 : 11,
                       ),
                     ),
                   ),
@@ -1050,8 +1077,8 @@ class _PhaseStatusIcon extends StatelessWidget {
         return Transform.scale(
           scale: value,
           child: Container(
-            width: 40,
-            height: 40,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -1065,8 +1092,8 @@ class _PhaseStatusIcon extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: color.withOpacity(0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -1074,7 +1101,7 @@ class _PhaseStatusIcon extends StatelessWidget {
               isSuccessful
                   ? (wasCached ? Icons.flash_on : Icons.check_rounded)
                   : Icons.close_rounded,
-              size: 20,
+              size: 16,
               color: Colors.white,
             ),
           ),
@@ -1092,6 +1119,9 @@ class _PhasesFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+
     final totalDuration = provider.phases.fold<int>(
       0,
           (sum, phase) => sum + phase.duration.inMilliseconds,
@@ -1101,7 +1131,7 @@ class _PhasesFooter extends StatelessWidget {
     final cachedCount = provider.phases.where((p) => p.wasCached ?? false).length;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -1112,46 +1142,44 @@ class _PhasesFooter extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
         ),
       ),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
-          Expanded(
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _StatBadge(
-                  icon: Icons.timer_rounded,
-                  label: 'Total Time',
-                  value: '${totalDuration}ms',
-                  color: theme.colorScheme.primary,
-                ),
-                _StatBadge(
-                  icon: Icons.check_circle_rounded,
-                  label: 'Success',
-                  value: '$successCount',
-                  color: PhaseColors.success,
-                ),
-                if (errorCount > 0)
-                  _StatBadge(
-                    icon: Icons.error_rounded,
-                    label: 'Errors',
-                    value: '$errorCount',
-                    color: PhaseColors.error,
-                  ),
-                if (cachedCount > 0)
-                  _StatBadge(
-                    icon: Icons.flash_on,
-                    label: 'Cached',
-                    value: '$cachedCount',
-                    color: PhaseColors.cached,
-                  ),
-              ],
-            ),
+          _StatBadge(
+            icon: Icons.timer_rounded,
+            label: 'Total',
+            value: '${totalDuration}ms',
+            color: theme.colorScheme.primary,
+            isSmall: isSmallScreen,
           ),
+          _StatBadge(
+            icon: Icons.check_circle_rounded,
+            label: 'Success',
+            value: '$successCount',
+            color: PhaseColors.success,
+            isSmall: isSmallScreen,
+          ),
+          if (errorCount > 0)
+            _StatBadge(
+              icon: Icons.error_rounded,
+              label: 'Errors',
+              value: '$errorCount',
+              color: PhaseColors.error,
+              isSmall: isSmallScreen,
+            ),
+          if (cachedCount > 0)
+            _StatBadge(
+              icon: Icons.flash_on,
+              label: 'Cached',
+              value: '$cachedCount',
+              color: PhaseColors.cached,
+              isSmall: isSmallScreen,
+            ),
         ],
       ),
     );
@@ -1163,12 +1191,14 @@ class _StatBadge extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final bool isSmall;
 
   const _StatBadge({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.isSmall = false,
   });
 
   @override
@@ -1176,10 +1206,13 @@ class _StatBadge extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmall ? 10 : 12,
+        vertical: isSmall ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: color.withOpacity(0.3),
           width: 1,
@@ -1188,8 +1221,8 @@ class _StatBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
+          Icon(icon, size: isSmall ? 14 : 16, color: color),
+          const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -1197,18 +1230,18 @@ class _StatBadge extends StatelessWidget {
               Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 10,
+                  fontSize: isSmall ? 9 : 10,
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 value,
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: color,
-                  fontSize: 14,
+                  fontSize: isSmall ? 12 : 13,
                 ),
               ),
             ],

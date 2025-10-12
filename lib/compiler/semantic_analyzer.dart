@@ -8,6 +8,7 @@ class Symbol {
   final bool isFunction;
   final bool isLambda;
   final List<String>? parameters;
+  final String scope;
 
   Symbol({
     required this.name,
@@ -16,6 +17,7 @@ class Symbol {
     this.isFunction = false,
     this.isLambda = false,
     this.parameters,
+    this.scope = 'global',
   });
 
   @override
@@ -238,6 +240,7 @@ class SemanticAnalyzer implements ASTVisitor<String?> {
             type: statement.returnType,
             isFunction: true,
             parameters: parameters,
+            scope: 'global',
           );
         }
       }
@@ -275,10 +278,13 @@ class SemanticAnalyzer implements ASTVisitor<String?> {
       }
     }
 
+    final scopeName = scopeStack.isEmpty ? 'global' : 'local';
+
     _addSymbol(node.name, Symbol(
       name: node.name,
       type: actualType,
       isLambda: isLambda,
+      scope: scopeName,
     ));
 
     if (node.initialValue != null) {
@@ -449,7 +455,11 @@ class SemanticAnalyzer implements ASTVisitor<String?> {
     currentFunctionHasReturn = false;
 
     for (final param in node.parameters) {
-      _addSymbol(param.value, Symbol(name: param.value, type: param.key));
+      _addSymbol(param.value, Symbol(
+        name: param.value,
+        type: param.key,
+        scope: 'local',
+      ));
     }
 
     node.body.accept(this);
@@ -525,7 +535,11 @@ class SemanticAnalyzer implements ASTVisitor<String?> {
     _pushScope();
 
     for (final param in node.parameters) {
-      _addSymbol(param.value, Symbol(name: param.value, type: param.key));
+      _addSymbol(param.value, Symbol(
+        name: param.value,
+        type: param.key,
+        scope: 'local',
+      ));
     }
 
     final bodyType = node.body.accept(this);
@@ -585,7 +599,13 @@ class SemanticAnalyzer implements ASTVisitor<String?> {
       ));
     }
 
-    _addSymbol(node.name, Symbol(name: node.name, type: node.type, isArray: true));
+    final scopeName = scopeStack.isEmpty ? 'global' : 'local';
+    _addSymbol(node.name, Symbol(
+      name: node.name,
+      type: node.type,
+      isArray: true,
+      scope: scopeName,
+    ));
     return null;
   }
 
@@ -767,6 +787,40 @@ class SemanticAnalyzer implements ASTVisitor<String?> {
       'errors': errors.length,
       'warnings': warnings.length,
     };
+  }
+
+  Map<String, dynamic> getSymbolTableAsMap() {
+    final result = <String, dynamic>{};
+
+    for (final entry in globalSymbolTable.entries) {
+      final symbol = entry.value;
+      result[entry.key] = {
+        'type': symbol.type,
+        'isFunction': symbol.isFunction,
+        'isArray': symbol.isArray,
+        'isLambda': symbol.isLambda,
+        'parameters': symbol.parameters ?? [],
+        'scope': symbol.scope,
+      };
+    }
+
+    for (int i = 0; i < scopeStack.length; i++) {
+      for (final entry in scopeStack[i].entries) {
+        final symbol = entry.value;
+        // Use a unique key for local scopes
+        final key = '${entry.key}_scope$i';
+        result[key] = {
+          'type': symbol.type,
+          'isFunction': symbol.isFunction,
+          'isArray': symbol.isArray,
+          'isLambda': symbol.isLambda,
+          'parameters': symbol.parameters ?? [],
+          'scope': 'local',
+        };
+      }
+    }
+
+    return result;
   }
 
   List<Symbol> getAllSymbols() {

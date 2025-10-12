@@ -398,7 +398,6 @@ class CodeIntelligence {
   }
 
   bool _isInFunctionDeclarationContext(int position, String varName, String code) {
-    // Check if directly preceded by 'func '
     if (position >= 5) {
       final before = code.substring(position - 5, position);
       if (before == 'func ') {
@@ -406,7 +405,6 @@ class CodeIntelligence {
       }
     }
 
-    // More robust check: look for 'func' keyword before this position
     int searchStart = position - 20;
     if (searchStart < 0) searchStart = 0;
 
