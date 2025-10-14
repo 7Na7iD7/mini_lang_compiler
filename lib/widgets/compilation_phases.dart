@@ -9,6 +9,7 @@ class PhaseColors {
   static const cached = Color(0xFF3B82F6);
   static const warning = Color(0xFFF59E0B);
   static const info = Color(0xFF8B5CF6);
+  static const optimization = Color(0xFFEC4899);
 }
 
 class CompilationPhases extends StatefulWidget {
@@ -89,7 +90,7 @@ class _CompilationPhasesState extends State<CompilationPhases>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ComprehensiveCompilerViewer(
-          sourceCode: provider.sourceCode ?? '',
+          sourceCode: provider.sourceCode,
         ),
       ),
     );
@@ -157,13 +158,6 @@ class _CompilationPhasesState extends State<CompilationPhases>
       _progressController.stop();
       _progressController.value = 0;
     }
-  }
-
-  Color _getPhaseColor(CompilationPhase phase, ThemeData theme) {
-    if ((phase.wasCached ?? false) && (phase.isSuccessful ?? false)) {
-      return PhaseColors.cached;
-    }
-    return (phase.isSuccessful ?? false) ? PhaseColors.success : PhaseColors.error;
   }
 }
 
@@ -529,8 +523,6 @@ class _PhaseItem extends StatefulWidget {
 }
 
 class _PhaseItemState extends State<_PhaseItem> {
-  bool _isHovered = false;
-
   @override
   Widget build(BuildContext context) {
     if (widget.animController == null) {
@@ -853,17 +845,18 @@ class _PhaseItemState extends State<_PhaseItem> {
 
   Map<String, String> _extractPhaseDetails(String phaseName, String result) {
     final details = <String, String>{};
+    final lower = phaseName.toLowerCase();
 
-    if (phaseName.toLowerCase().contains('lexical') || phaseName.toLowerCase().contains('lex')) {
+    if (lower.contains('lexical') || lower.contains('lex')) {
       final tokenMatch = RegExp(r'(\d+)\s+tokens').firstMatch(result);
       final typesMatch = RegExp(r'\((\d+)\s+types\)').firstMatch(result);
 
       if (tokenMatch != null) details['Tokens'] = tokenMatch.group(1)!;
       if (typesMatch != null) details['Token Types'] = typesMatch.group(1)!;
-    } else if (phaseName.toLowerCase().contains('pars')) {
+    } else if (lower.contains('pars')) {
       final nodesMatch = RegExp(r'(\d+)\s+nodes').firstMatch(result);
       if (nodesMatch != null) details['AST Nodes'] = nodesMatch.group(1)!;
-    } else if (phaseName.toLowerCase().contains('semantic')) {
+    } else if (lower.contains('semantic')) {
       final symbolsMatch = RegExp(r'Symbols:\s*(\d+)').firstMatch(result);
       final functionsMatch = RegExp(r'Functions:\s*(\d+)').firstMatch(result);
       final variablesMatch = RegExp(r'Variables:\s*(\d+)').firstMatch(result);
@@ -871,7 +864,17 @@ class _PhaseItemState extends State<_PhaseItem> {
       if (symbolsMatch != null) details['Symbols'] = symbolsMatch.group(1)!;
       if (functionsMatch != null) details['Functions'] = functionsMatch.group(1)!;
       if (variablesMatch != null) details['Variables'] = variablesMatch.group(1)!;
-    } else if (phaseName.toLowerCase().contains('interpret') || phaseName.toLowerCase().contains('execut')) {
+    } else if (lower.contains('optim')) {
+      final foldedMatch = RegExp(r'(\d+)\s+constants folded').firstMatch(result);
+      final deadCodeMatch = RegExp(r'(\d+)\s+dead code removed').firstMatch(result);
+      final simplifiedMatch = RegExp(r'(\d+)\s+expressions simplified').firstMatch(result);
+      final passesMatch = RegExp(r'(\d+)\s+passes').firstMatch(result);
+
+      if (passesMatch != null) details['Passes'] = passesMatch.group(1)!;
+      if (foldedMatch != null) details['Constants Folded'] = foldedMatch.group(1)!;
+      if (deadCodeMatch != null) details['Dead Code Removed'] = deadCodeMatch.group(1)!;
+      if (simplifiedMatch != null) details['Expressions Simplified'] = simplifiedMatch.group(1)!;
+    } else if (lower.contains('interpret') || lower.contains('execut')) {
       final linesMatch = RegExp(r'(\d+)\s+lines').firstMatch(result);
       if (linesMatch != null) details['Output Lines'] = linesMatch.group(1)!;
     }

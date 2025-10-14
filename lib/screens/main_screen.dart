@@ -474,6 +474,20 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         ],
       ),
       actions: [
+        IconButton(
+          tooltip: 'فعال/غیرفعال کردن بهینه‌ساز',
+          icon: Icon(
+            provider.isOptimizationEnabled
+                ? Icons.speed_rounded
+                : Icons.speed_outlined,
+            color: provider.isOptimizationEnabled
+                ? const Color(0xFFEC4899)
+                : Colors.white.withOpacity(0.8),
+          ),
+          onPressed: () {
+            provider.toggleOptimization();
+          },
+        ),
         Padding(
           padding: const EdgeInsets.only(right: 8.0),
           child: AnimatedStatusIndicator(),

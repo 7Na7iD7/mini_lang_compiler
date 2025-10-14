@@ -4,6 +4,7 @@ import '../compiler/lexer.dart';
 import '../compiler/parser.dart';
 import '../compiler/semantic_analyzer.dart';
 import '../compiler/interpreter.dart';
+import '../compiler/minilang_optimizer.dart';
 import '../models/token_types.dart';
 import '../models/ast_nodes.dart';
 import 'smart_cache_manager.dart';
@@ -14,8 +15,8 @@ enum CompilerState {
   lexing,
   parsing,
   analyzing,
-  interpreting,
   optimizing,
+  interpreting,
   completed,
   error,
 }
@@ -59,14 +60,21 @@ class CompilerConfig {
 // Data class for isolate communication
 class _CompilationData {
   final String sourceCode;
+  final bool enableOptimization;
+  final OptimizerConfig optimizerConfig;
 
-  _CompilationData({required this.sourceCode});
+  _CompilationData({
+    required this.sourceCode,
+    this.enableOptimization = false,
+    this.optimizerConfig = const OptimizerConfig(),
+  });
 }
 
 // Result class for isolate communication
 class _CompilationResult {
   final List<Map<String, dynamic>> tokensJson;
   final Map<String, dynamic>? astJson;
+  final Map<String, dynamic>? optimizedAstJson;
   final Map<String, dynamic>? symbolTableJson;
   final List<String> executionLogJson;
   final String output;
@@ -77,15 +85,20 @@ class _CompilationResult {
   final List<String> analyzerErrors;
   final List<String> analyzerWarnings;
   final List<String> interpreterErrors;
+  final List<String> optimizationLog;
+  final List<String> optimizerWarnings;
+  final Map<String, dynamic> optimizationStats;
   final Map<String, dynamic> stats;
   final int lexerDurationMs;
   final int parserDurationMs;
   final int analyzerDurationMs;
+  final int optimizerDurationMs;
   final int interpreterDurationMs;
 
   _CompilationResult({
     required this.tokensJson,
     required this.astJson,
+    this.optimizedAstJson,
     required this.symbolTableJson,
     required this.executionLogJson,
     required this.output,
@@ -96,10 +109,14 @@ class _CompilationResult {
     required this.analyzerErrors,
     required this.analyzerWarnings,
     required this.interpreterErrors,
+    this.optimizationLog = const [],
+    this.optimizerWarnings = const [],
+    this.optimizationStats = const {},
     required this.stats,
     required this.lexerDurationMs,
     required this.parserDurationMs,
     required this.analyzerDurationMs,
+    this.optimizerDurationMs = 0,
     required this.interpreterDurationMs,
   });
 }
@@ -111,10 +128,13 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   String _output = '';
   List<Token> _tokens = [];
   Program? _ast;
+  Program? _optimizedAst;
   Map<String, dynamic>? _symbolTable;
   List<String> _executionLog = [];
   bool _isRunning = false;
   bool _isCacheEnabled = true;
+  bool _isOptimizationEnabled = false;
+  OptimizerConfig _optimizerConfig = const OptimizerConfig();
 
   Map<String, dynamic> _compilationStats = {};
   List<String> _suggestions = [];
@@ -144,12 +164,15 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   String get output => _output;
   List<Token> get tokens => List.unmodifiable(_tokens);
   Program? get ast => _ast;
+  Program? get optimizedAst => _optimizedAst;
   Map<String, dynamic>? get symbolTable => _symbolTable;
   List<String> get executionLog => List.unmodifiable(_executionLog);
   Map<String, dynamic> get compilationStats => Map.unmodifiable(_compilationStats);
   List<String> get suggestions => List.unmodifiable(_suggestions);
   bool get isRunning => _isRunning;
   bool get isCacheEnabled => _isCacheEnabled;
+  bool get isOptimizationEnabled => _isOptimizationEnabled;
+  OptimizerConfig get optimizerConfig => _optimizerConfig;
   Map<String, dynamic> get cacheStatistics => Map.unmodifiable(_cacheStats);
   int get executionTime => _executionTime;
 
@@ -158,6 +181,16 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       _sourceCode = value;
       notifyListeners();
     }
+  }
+
+  void toggleOptimization() {
+    _isOptimizationEnabled = !_isOptimizationEnabled;
+    notifyListeners();
+  }
+
+  void setOptimizerConfig(OptimizerConfig config) {
+    _optimizerConfig = config;
+    notifyListeners();
   }
 
   void loadExampleCode(String exampleKey) {
@@ -198,6 +231,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       // Perform full compilation in isolate with timeout
       final result = await compute(_compileInIsolate, _CompilationData(
         sourceCode: _sourceCode,
+        enableOptimization: _isOptimizationEnabled,
+        optimizerConfig: _optimizerConfig,
       )).timeout(
         Duration(milliseconds: CompilerConfig.maxCompilationTimeMs),
         onTimeout: () {
@@ -344,9 +379,38 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       );
     }
 
+    Program finalAst = ast;
+    List<String> optimizationLog = [];
+    List<String> optimizerWarnings = [];
+    Map<String, dynamic> optimizationStats = {};
+    int optimizerDurationMs = 0;
+
+    if (data.enableOptimization) {
+
+      final optimizerStart = DateTime.now();
+      final optimizer = Optimizer(config: data.optimizerConfig);
+      final optimizationResult = optimizer.optimize(ast);
+      final optimizerDuration = DateTime.now().difference(optimizerStart);
+
+      finalAst = optimizationResult.optimizedProgram;
+      optimizationLog = optimizationResult.optimizations;
+      optimizerWarnings = optimizationResult.warnings.map((w) => w.toString()).toList();
+      optimizationStats = optimizationResult.statistics;
+      optimizerDurationMs = optimizerDuration.inMilliseconds;
+    } else {
+      optimizerDurationMs = 0;
+      optimizationStats = {
+        'passes': 0,
+        'constantsFolded': 0,
+        'deadCodeRemoved': 0,
+        'expressionsSimplified': 0,
+        'propagations': 0,
+      };
+    }
+
     // Interpretation
     final interpreterStart = DateTime.now();
-    final interpreter = Interpreter(ast);
+    final interpreter = Interpreter(finalAst);
     final interpretResult = interpreter.interpret();
     final interpreterDuration = DateTime.now().difference(interpreterStart);
 
@@ -365,6 +429,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         'position': t.position,
       }).toList(),
       astJson: ast.toJson(),
+      optimizedAstJson: data.enableOptimization ? finalAst.toJson() : null,
       symbolTableJson: symbolTable,
       executionLogJson: executionLog,
       output: interpretResult.output,
@@ -375,6 +440,9 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       analyzerErrors: analyzerErrors,
       analyzerWarnings: analyzerWarnings,
       interpreterErrors: interpreterErrors,
+      optimizationLog: optimizationLog,
+      optimizerWarnings: optimizerWarnings,
+      optimizationStats: optimizationStats,
       stats: {
         ...stats,
         'tokenCount': tokens.length,
@@ -383,6 +451,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       lexerDurationMs: lexerDuration.inMilliseconds,
       parserDurationMs: parserDuration.inMilliseconds,
       analyzerDurationMs: analyzerDuration.inMilliseconds,
+      optimizerDurationMs: optimizerDurationMs,
       interpreterDurationMs: interpreterDuration.inMilliseconds,
     );
   }
@@ -514,6 +583,30 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       return;
     }
 
+    _state = CompilerState.optimizing;
+    notifyListeners();
+    await Future.delayed(Duration(milliseconds: 50));
+
+    if (_isOptimizationEnabled && result.optimizedAstJson != null) {
+      _optimizedAst = Program.fromJson(result.optimizedAstJson!);
+
+      final optimizationSummary = result.optimizationStats.isNotEmpty
+          ? '${result.optimizationStats['passes']} passes completed: '
+          '${result.optimizationStats['constantsFolded']} constants folded, '
+          '${result.optimizationStats['deadCodeRemoved']} dead code removed, '
+          '${result.optimizationStats['expressionsSimplified']} expressions simplified'
+          : 'No optimizations applied';
+
+      _addPhase('Optimization', true, optimizationSummary, [],
+          warnings: result.optimizerWarnings,
+          duration: Duration(milliseconds: result.optimizerDurationMs),
+          stats: result.optimizationStats);
+    } else {
+      _addPhase('Optimization', true, 'Optimization disabled (skipped)', [],
+          duration: Duration(milliseconds: result.optimizerDurationMs),
+          stats: result.optimizationStats);
+    }
+
     _state = CompilerState.interpreting;
     notifyListeners();
     await Future.delayed(Duration(milliseconds: 50));
@@ -544,8 +637,11 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       'lexerTime': result.lexerDurationMs,
       'parserTime': result.parserDurationMs,
       'analyzerTime': result.analyzerDurationMs,
+      'optimizerTime': result.optimizerDurationMs,
       'interpreterTime': result.interpreterDurationMs,
+      'optimizationEnabled': _isOptimizationEnabled,
       ...result.stats,
+      if (result.optimizationStats.isNotEmpty) ...result.optimizationStats,
     };
 
     _state = CompilerState.completed;
@@ -595,12 +691,43 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
           cachedResult.errors, duration: Duration.zero, wasCached: true);
     }
 
+    _state = CompilerState.optimizing;
+    notifyListeners();
+    await Future.delayed(Duration(milliseconds: 30));
+
+    if (_isOptimizationEnabled && cachedResult.ast != null && cachedResult.errors.isEmpty) {
+      final optimizerStart = DateTime.now();
+      final optimizer = Optimizer(config: _optimizerConfig);
+      final optimizationResult = optimizer.optimize(cachedResult.ast!);
+      final optimizerDuration = DateTime.now().difference(optimizerStart);
+
+      _optimizedAst = optimizationResult.optimizedProgram;
+
+      final optimizationSummary = optimizationResult.statistics.isNotEmpty
+          ? '${optimizationResult.statistics['passes']} passes: '
+          '${optimizationResult.statistics['constantsFolded']} constants folded, '
+          '${optimizationResult.statistics['deadCodeRemoved']} dead code removed'
+          : 'No optimizations applied';
+
+      _addPhase('Optimization', true, optimizationSummary, [],
+          warnings: optimizationResult.warnings.map((w) => w.toString()).toList(),
+          duration: optimizerDuration,
+          stats: optimizationResult.statistics);
+    } else {
+      _addPhase('Optimization', true, 'Optimization disabled (skipped)', [],
+          duration: Duration.zero);
+    }
+
     if (cachedResult.ast != null && cachedResult.errors.isEmpty) {
       _state = CompilerState.interpreting;
       notifyListeners();
       await Future.delayed(Duration(milliseconds: 30));
 
-      await _runInterpreter(cachedResult.ast!);
+      final astToInterpret = _isOptimizationEnabled && _optimizedAst != null
+          ? _optimizedAst!
+          : cachedResult.ast!;
+
+      await _runInterpreter(astToInterpret);
     }
 
     stopwatch.stop();
@@ -609,6 +736,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       'totalTime': stopwatch.elapsedMilliseconds,
       'wasCached': true,
       'cacheHit': true,
+      'optimizationEnabled': _isOptimizationEnabled,
     };
 
     _state = CompilerState.completed;
@@ -693,6 +821,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     _output = '';
     _tokens.clear();
     _ast = null;
+    _optimizedAst = null;
     _symbolTable = null;
     _executionLog.clear();
     _compilationStats.clear();
@@ -795,8 +924,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       case CompilerState.lexing: return 'Tokenizing...';
       case CompilerState.parsing: return 'Parsing...';
       case CompilerState.analyzing: return 'Analyzing...';
-      case CompilerState.interpreting: return 'Interpreting...';
       case CompilerState.optimizing: return 'Optimizing...';
+      case CompilerState.interpreting: return 'Interpreting...';
       case CompilerState.completed: return 'Completed';
       case CompilerState.error: return 'Error';
     }
@@ -806,10 +935,10 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     switch (_state) {
       case CompilerState.idle: return 0.0;
       case CompilerState.lexing: return 0.2;
-      case CompilerState.parsing: return 0.4;
-      case CompilerState.analyzing: return 0.6;
+      case CompilerState.parsing: return 0.35;
+      case CompilerState.analyzing: return 0.5;
+      case CompilerState.optimizing: return 0.65;
       case CompilerState.interpreting: return 0.8;
-      case CompilerState.optimizing: return 0.9;
       case CompilerState.completed:
       case CompilerState.error: return 1.0;
     }
@@ -834,6 +963,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         return 'Lambda Functions: Anonymous functions with syntax (params) => expression';
       case 'recursion':
         return 'Optimized Recursion: Improved handling of recursive function calls';
+      case 'optimization':
+        return 'Code Optimization: Constant folding, dead code elimination, algebraic simplification';
       default:
         return 'Feature information not available';
     }
@@ -847,6 +978,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       'switch': _sourceCode.contains('switch'),
       'lambda': _sourceCode.contains('=>'),
       'recursion': _hasRecursiveFunctions(),
+      'optimization': _isOptimizationEnabled,
     };
     return features;
   }

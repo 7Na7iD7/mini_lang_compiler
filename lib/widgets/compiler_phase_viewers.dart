@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/token_types.dart';
 import '../models/ast_nodes.dart';
 import '../compiler/interpreter.dart';
+import '../compiler/minilang_optimizer.dart';
 
 // Lexer Phase Viewer
 class LexerPhaseViewer extends StatefulWidget {
@@ -484,7 +485,6 @@ class _LexerPhaseViewerState extends State<LexerPhaseViewer> {
 }
 
 // Parser Phase Viewer
-
 class ParserPhaseViewer extends StatefulWidget {
   final Program? ast;
   final List<CompilerError> errors;
@@ -1343,6 +1343,627 @@ class _SemanticPhaseViewerState extends State<SemanticPhaseViewer> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class OptimizerPhaseViewer extends StatefulWidget {
+  final OptimizationResult? optimizationResult;
+  final Program? originalAST;
+
+  const OptimizerPhaseViewer({
+    super.key,
+    required this.optimizationResult,
+    required this.originalAST,
+  });
+
+  @override
+  State<OptimizerPhaseViewer> createState() => _OptimizerPhaseViewerState();
+}
+
+class _OptimizerPhaseViewerState extends State<OptimizerPhaseViewer>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildHeader(context),
+        if (widget.optimizationResult?.warnings.isNotEmpty ?? false)
+          _buildMessagesSection(context),
+        if (widget.optimizationResult != null) ...[
+          const SizedBox(height: 8),
+          _buildStatistics(context),
+          const SizedBox(height: 8),
+          _buildTabs(context),
+        ],
+        Expanded(
+          child: widget.optimizationResult == null
+              ? _buildEmptyState(context, 'No optimization data available')
+              : TabBarView(
+            controller: _tabController,
+            children: [
+              _ASTComparisonView(
+                originalAst: widget.originalAST,
+                optimizedAst: widget.optimizationResult!.optimizedProgram,
+              ),
+              _OptimizationLogView(
+                optimizations: widget.optimizationResult!.optimizations,
+                scrollController: _scrollController,
+              ),
+              _buildWarningsView(context),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    const color = Color(0xFFEC4899);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withOpacity(0.1),
+            color.withOpacity(0.05),
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [color, color.withOpacity(0.8)]),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.speed_rounded, size: 24, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Optimization',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  'Improving code efficiency',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessagesSection(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_outlined, color: Colors.orange, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'Optimization Warnings',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.orange[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...widget.optimizationResult!.warnings.map((warning) =>
+              _buildMessageItem(context, warning, false)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatistics(BuildContext context) {
+    final theme = Theme.of(context);
+    const color = Color(0xFFEC4899);
+    final stats = widget.optimizationResult!.statistics;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          _buildStatChip(context, 'Passes', '${stats['passes'] ?? 0}', Icons.sync_rounded),
+          _buildStatChip(context, 'Folded', '${stats['constantsFolded'] ?? 0}', Icons.compress_rounded),
+          _buildStatChip(context, 'Removed', '${stats['deadCodeRemoved'] ?? 0}', Icons.delete_sweep_rounded),
+          _buildStatChip(context, 'Simplified', '${stats['expressionsSimplified'] ?? 0}', Icons.transform_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(BuildContext context, String label, String value, IconData icon) {
+    final theme = Theme.of(context);
+    const color = Color(0xFFEC4899);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$label: ',
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabs(BuildContext context) {
+    final theme = Theme.of(context);
+    const color = Color(0xFFEC4899);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: TabBar(
+        controller: _tabController,
+        labelColor: color,
+        unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.7),
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: color.withOpacity(0.1),
+        ),
+        tabs: [
+          Tab(
+            icon: Icon(Icons.compare_arrows_rounded, size: 18),
+            text: 'AST Diff',
+          ),
+          Tab(
+            icon: Icon(Icons.list_alt_rounded, size: 18),
+            text: 'Log',
+          ),
+          Tab(
+            icon: Icon(Icons.warning_amber_rounded, size: 18),
+            text: 'Warnings',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageItem(BuildContext context, CompilerError message, bool isError) {
+    final theme = Theme.of(context);
+    final color = isError ? Colors.red : Colors.orange;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isError ? Icons.error_outline : Icons.warning_amber_outlined,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message.toString(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWarningsView(BuildContext context) {
+    final warnings = widget.optimizationResult?.warnings ?? [];
+    if (warnings.isEmpty) {
+      return _buildEmptyState(context, 'No optimization warnings');
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: warnings.length,
+      itemBuilder: (context, index) {
+        return _buildMessageItem(context, warnings[index], false);
+      },
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.speed_rounded,
+            size: 48,
+            color: theme.colorScheme.onSurface.withOpacity(0.3),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ASTComparisonView extends StatelessWidget {
+  final Program? originalAst;
+  final Program? optimizedAst;
+
+  const _ASTComparisonView({required this.originalAst, required this.optimizedAst});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (originalAst == null || optimizedAst == null) {
+      return const Center(child: Text('AST not available'));
+    }
+
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _ASTTreeView(title: 'Original AST', ast: originalAst!)),
+          VerticalDivider(width: 1, color: theme.colorScheme.outline.withOpacity(0.2)),
+          Expanded(child: _ASTTreeView(title: 'Optimized AST', ast: optimizedAst!, isOptimized: true)),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptimizationLogView extends StatelessWidget {
+  final List<String> optimizations;
+  final ScrollController scrollController;
+
+  const _OptimizationLogView({
+    required this.optimizations,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const color = Color(0xFFEC4899);
+
+    if (optimizations.isEmpty) {
+      return Center(
+        child: Text(
+          'No optimization logs available',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+      ),
+      child: ListView.builder(
+        controller: scrollController,
+        padding: const EdgeInsets.all(12),
+        itemCount: optimizations.length,
+        itemBuilder: (context, index) {
+          final log = optimizations[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 12, color: color.withOpacity(0.8)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    log,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      height: 1.3,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ASTTreeView extends StatefulWidget {
+  final String title;
+  final Program ast;
+  final bool isOptimized;
+
+  const _ASTTreeView({
+    required this.title,
+    required this.ast,
+    this.isOptimized = false,
+  });
+
+  @override
+  State<_ASTTreeView> createState() => _ASTTreeViewState();
+}
+
+class _ASTTreeViewState extends State<_ASTTreeView> {
+  final Set<String> _expandedNodes = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = widget.isOptimized ? const Color(0xFF10B981) : const Color(0xFF3B82F6);
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(10),
+              topRight: Radius.circular(10),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.account_tree_rounded, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(
+                widget.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [_buildASTTree(context, widget.ast, '', true)],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<ASTNode> _getNodeChildren(ASTNode node) {
+    if (node is Program) return node.statements;
+    if (node is Block) return node.statements;
+    if (node is FunctionDeclaration) return [node.body];
+    if (node is IfStatement) {
+      return [
+        node.condition,
+        node.thenBranch,
+        if (node.elseBranch != null) node.elseBranch!,
+      ];
+    }
+    if (node is WhileStatement) return [node.condition, node.body];
+    if (node is BinaryExpression) return [node.left, node.right];
+    if (node is UnaryExpression) return [node.operand];
+    return [];
+  }
+
+  Color _getNodeColor(ASTNode node) {
+    if (node is Program || node is Block) return const Color(0xFF8B5CF6);
+    if (node is FunctionDeclaration) return const Color(0xFFEF4444);
+    if (node is VariableDeclaration || node is Assignment) return const Color(0xFF3B82F6);
+    if (node is IfStatement || node is WhileStatement) return const Color(0xFFF59E0B);
+    if (node is BinaryExpression) return const Color(0xFF10B981);
+    if (node is NumberLiteral || node is StringLiteral || node is BooleanLiteral) return Colors.teal;
+    return Colors.grey;
+  }
+
+  IconData _getNodeIcon(ASTNode node) {
+    if (node is Program) return Icons.source_rounded;
+    if (node is Block) return Icons.data_object_rounded;
+    if (node is FunctionDeclaration) return Icons.functions_rounded;
+    if (node is VariableDeclaration) return Icons.code_rounded;
+    if (node is IfStatement) return Icons.alt_route_rounded;
+    if (node is WhileStatement) return Icons.loop_rounded;
+    if (node is BinaryExpression) return Icons.calculate_rounded;
+    if (node is PrintStatement) return Icons.print_rounded;
+    if (node is NumberLiteral) return Icons.pin_rounded;
+    return Icons.circle_outlined;
+  }
+
+  String _getNodeLabel(ASTNode node) {
+    if (node is Program) return 'Program (${node.statements.length} stmts)';
+    if (node is Block) return 'Block (${node.statements.length} stmts)';
+    if (node is FunctionDeclaration) return 'Func ${node.name}()';
+    if (node is VariableDeclaration) return 'var ${node.name}';
+    if (node is IfStatement) return 'If Statement';
+    if (node is WhileStatement) return 'While Loop';
+    if (node is BinaryExpression) return 'Binary: ${node.operator}';
+    if (node is NumberLiteral) return 'Num: ${node.value}';
+    if (node is StringLiteral) return 'Str: "${node.value}"';
+    if (node is BooleanLiteral) return 'Bool: ${node.value}';
+    if (node is Identifier) return 'ID: ${node.name}';
+    if (node is PrintStatement) return 'Print';
+    return node.runtimeType.toString();
+  }
+
+  Widget _buildASTTree(BuildContext context, ASTNode node, String path, bool isLast) {
+    final theme = Theme.of(context);
+    final nodeId = path;
+    final isExpanded = _expandedNodes.contains(nodeId);
+    final children = _getNodeChildren(node);
+    final hasChildren = children.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: hasChildren
+              ? () {
+            setState(() {
+              if (isExpanded) {
+                _expandedNodes.remove(nodeId);
+              } else {
+                _expandedNodes.add(nodeId);
+              }
+            });
+          }
+              : null,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _getNodeColor(node).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: _getNodeColor(node).withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasChildren)
+                  Icon(
+                    isExpanded ? Icons.expand_more : Icons.chevron_right,
+                    size: 16,
+                    color: _getNodeColor(node),
+                  )
+                else
+                  const SizedBox(width: 16),
+                const SizedBox(width: 6),
+                Icon(_getNodeIcon(node), size: 14, color: _getNodeColor(node)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    _getNodeLabel(node),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isExpanded && hasChildren) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children.asMap().entries.map((entry) {
+                final index = entry.key;
+                final child = entry.value;
+                final childPath = '$path/$index';
+                final isLastChild = index == children.length - 1;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _buildASTTree(context, child, childPath, isLastChild),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
