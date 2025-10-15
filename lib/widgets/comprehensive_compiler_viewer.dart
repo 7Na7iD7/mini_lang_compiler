@@ -6,8 +6,7 @@ import '../compiler/parser.dart';
 import '../compiler/semantic_analyzer.dart';
 import '../compiler/interpreter.dart';
 import '../compiler/minilang_optimizer.dart';
-import 'compiler_phase_viewers.dart';
-import 'optimizer_phase_viewer.dart' as optViewer;
+import '../widgets/compiler_phase_viewers.dart';
 
 class ComprehensiveCompilerViewer extends StatefulWidget {
   final String sourceCode;
@@ -118,8 +117,7 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
         _interpreterResult = _interpreter.interpret();
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('A critical error occurred during compilation: $e');
+      debugPrint('A critical error occurred during compilation: $e');
     } finally {
       setState(() {});
     }
@@ -177,7 +175,6 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
 
     return Column(
       children: [
-        // Compact header for mobile
         _buildCompactHeader(context, isSmallScreen),
         const Divider(height: 1),
         Expanded(
@@ -512,7 +509,7 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
     int totalWarnings = (_lexer.warnings.length) +
         (_parser.warnings.length) +
         (_semanticAnalyzer.warnings.length) +
-        (_optimizationResult?.warnings.length ?? 0) +  // *** فیکس کوچک: null-safety ***
+        (_optimizationResult?.warnings.length ?? 0) +
         (_interpreter.errors.where((e) => e.type == MessageType.warning).length);
 
     return Padding(
@@ -605,7 +602,7 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
           warnings: _semanticAnalyzer.warnings,
         );
       case 3:
-        return optViewer.OptimizerPhaseViewer(
+        return OptimizerPhaseViewer(
           optimizationResult: _optimizationResult,
           originalAST: _ast,
         );
