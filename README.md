@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="800" alt="Na7iD Banner" src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=200&section=header&text=Na7iD&fontSize=80&fontAlignY=35&animation=twinkling&fontColor=fff"/>
+<img width="800" alt="Na7iD Banner" src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=0,2,3,5,6,12,14,18,24,27&height=250&section=header&text=Na7iD&fontSize=90&fontAlignY=38&animation=twinkling&fontColor=gradient&stroke=00D9FF&strokeWidth=2&fontAlign=50"/>
 
 # 🚀 MiniLang Compiler
 
@@ -648,7 +648,7 @@ Amazing cross-platform framework | Robust language and tooling | Provider, Share
 
 <div align="center">
 
-<img width="800" alt="Na7iD Footer" src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=200&section=footer&text=Na7iD&fontSize=80&fontAlignY=65&animation=twinkling&fontColor=fff&desc=Code%20is%20Poetry,%20Compilers%20are%20Art&descSize=20&descAlignY=85"/>
+<img width="800" alt="Na7iD Footer" src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=0,2,3,5,6,12,14,18,24,27&height=250&section=footer&text=Na7iD&fontSize=90&fontAlignY=62&animation=twinkling&fontColor=gradient&stroke=FF6B6B&strokeWidth=2&desc=Code%20is%20Poetry,%20Compilers%20are%20Art&descSize=22&descAlignY=80&descAlign=50"/>
 
 ### ✨ **Built with ❤️ for compiler enthusiasts** ✨
 
