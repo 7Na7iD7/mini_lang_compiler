@@ -13,6 +13,19 @@
 
 [Features](#-features) • [Installation](#️-installation) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
+---
+
+```
+███╗   ██╗ █████╗ ███████╗██╗  ██╗██████╗ 
+████╗  ██║██╔══██╗╚════██║██║  ██║██╔══██╗
+██╔██╗ ██║███████║    ██╔╝███████║██║  ██║
+██║╚██╗██║██╔══██║   ██╔╝ ██╔══██║██║  ██║
+██║ ╚████║██║  ██║   ██║  ██║  ██║██████╔╝
+╚═╝  ╚═══╝╚═╝  ╚═╝   ╚═╝  ╚═╝  ╚═╝╚═════╝ 
+```
+
+**Crafted by Na7iD**
+
 </div>
 
 ## 📖 Overview
@@ -616,29 +629,7 @@ git push origin feature/amazing-feature
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.
-
-```
-MIT License
-
-Copyright (c) 2025 MiniLang Compiler Contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-```
-
-[Full License Text →](LICENSE)
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -664,38 +655,33 @@ Amazing cross-platform framework | Robust language and tooling | Provider, Share
 
 </div>
 
-## 📞 Support & Community
-
-<div align="center">
-
-**Questions?** Open an [Issue](https://github.com/yourusername/minilang-compiler/issues)
-
-**Want to chat?** Join our [Discussions](https://github.com/yourusername/minilang-compiler/discussions)
-
-**Found a bug?** Report it [here](https://github.com/yourusername/minilang-compiler/issues/new)
-
----
-
-### Stats
-
-![GitHub stars](https://img.shields.io/github/stars/yourusername/minilang-compiler?style=social)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/minilang-compiler?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/yourusername/minilang-compiler?style=social)
-
----
-
-**Built with ❤️ by compiler enthusiasts, for compiler enthusiasts**
-
-*Last Updated: October 22, 2025*
-
-</div>
-
 ---
 
 <div align="center">
 
-### 🌟 Star this repo if you find it helpful!
+```
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   ███╗   ██╗ █████╗ ███████╗██╗  ██╗██████╗                ║
+║   ████╗  ██║██╔══██╗╚════██║██║  ██║██╔══██╗               ║
+║   ██╔██╗ ██║███████║    ██╔╝███████║██║  ██║               ║
+║   ██║╚██╗██║██╔══██║   ██╔╝ ██╔══██║██║  ██║               ║
+║   ██║ ╚████║██║  ██║   ██║  ██║  ██║██████╔╝               ║
+║   ╚═╝  ╚═══╝╚═╝  ╚═╝   ╚═╝  ╚═╝  ╚═╝╚═════╝                ║
+║                                                              ║
+║          「 Architected with Passion & Precision 」          ║
+║                                                              ║
+║     ⚡ Flutter Expert  •  🎨 UI/UX Specialist               ║
+║     💻 Full-Stack Developer  •  🚀 Open Source Contributor  ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+```
 
-**[⬆ Back to Top](#-minilang-compiler)**
+### ✨ **Built with ❤️ for compiler enthusiasts** ✨
+
+[![GitHub](https://img.shields.io/badge/GitHub-Na7iD-181717?style=for-the-badge&logo=github)](https://github.com/Na7iD)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-FF6B6B?style=for-the-badge&logo=safari&logoColor=white)](https://na7id.dev)
+
+**"Code is Poetry, Compilers are Art"**
 
 </div>
