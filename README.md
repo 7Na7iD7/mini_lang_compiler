@@ -309,11 +309,6 @@ lambda (int x) { return x * 2; }
 - AI chatbot interface
 - Reusable components (code editor, console, phase viewers)
 
-**Utilities** (`lib/utils/`)
-- ML/NLP engine for AI assistant
-- Example code library
-- Helper functions and extensions
-
 ---
 
 ## 🤖 AI Integration
