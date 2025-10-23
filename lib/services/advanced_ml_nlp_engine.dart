@@ -29,48 +29,61 @@ class AdvancedMLNLPEngine {
   void _initialize() {
     if (_isInitialized) return;
 
-    print('\n╔════════════════════════════════════════════════════════╗');
+    print('\n╔═══════════════════════════════════════════════════════╗');
     print('║   🚀 بارگذاری موتور ML/NLP پیشرفته...               ║');
-    print('╚════════════════════════════════════════════════════════╝\n');
+    print('╚═══════════════════════════════════════════════════════╝\n');
 
-    _attention = AttentionMechanism();
-    _transformer = TransformerEncoder(numLayers: 6, dModel: 128, numHeads: 8);
-    _bertEncoder = BERTLikeEncoder(hiddenSize: 256, numLayers: 4);
-    _semanticReasoner = SemanticReasoning();
-    _dialogueManager = DialogueManager();
-    _knowledgeGraph = KnowledgeGraph();
-    _contextualMemory = ContextualMemory(maxSize: 100);
-    _reinforcementLearner = ReinforcementLearner(alpha: 0.1, gamma: 0.9);
-    _multiTaskLearner = MultiTaskLearner();
-    _metaLearner = MetaLearner();
-    _advancedTokenizer = AdvancedTokenizer();
-    _dependencyParser = DependencyParser();
-    _corefResolver = CoreferenceResolver();
-    _intentClassifier = IntentClassifier();
+    try {
+      _attention = AttentionMechanism();
+      _transformer = TransformerEncoder(numLayers: 6, dModel: 128, numHeads: 8);
+      _bertEncoder = BERTLikeEncoder(hiddenSize: 256, numLayers: 4);
+      _semanticReasoner = SemanticReasoning();
+      _dialogueManager = DialogueManager();
+      _knowledgeGraph = KnowledgeGraph();
+      _contextualMemory = ContextualMemory(maxSize: 100);
+      _reinforcementLearner = ReinforcementLearner(alpha: 0.1, gamma: 0.9);
+      _multiTaskLearner = MultiTaskLearner();
+      _metaLearner = MetaLearner();
+      _advancedTokenizer = AdvancedTokenizer();
+      _dependencyParser = DependencyParser();
+      _corefResolver = CoreferenceResolver();
+      _intentClassifier = IntentClassifier();
 
-    _preloadKnowledge();
-    _isInitialized = true;
+      _preloadKnowledge();
+      _isInitialized = true;
 
-    print('╔════════════════════════════════════════════════════════╗');
-    print('║   ✅ موتور ML/NLP پیشرفته آماده است!                ║');
-    print('╠════════════════════════════════════════════════════════╣');
-    print('║   📦 الگوریتم‌های فعال:                              ║');
-    print('║   • Multi-Head Attention                               ║');
-    print('║   • Transformer Encoder (6 layers)                     ║');
-    print('║   • BERT-like Contextual Embeddings                    ║');
-    print('║   • Semantic Reasoning Engine                          ║');
-    print('║   • Advanced Dialogue Manager                          ║');
-    print('║   • Knowledge Graph with 500+ entities                 ║');
-    print('║   • Reinforcement Learning (Q-Learning)                ║');
-    print('║   • Meta-Learning (Learning to Learn)                  ║');
-    print('║   • Multi-Task Learning                                ║');
-    print('║   • Dependency Parsing                                 ║');
-    print('║   • Coreference Resolution                             ║');
-    print('║   • Advanced Intent Classification                     ║');
-    print('╚════════════════════════════════════════════════════════╝\n');
+      print('╔═══════════════════════════════════════════════════════╗');
+      print('║   ✅ موتور ML/NLP پیشرفته آماده است!                ║');
+      print('╠═══════════════════════════════════════════════════════╣');
+      print('║   📦 الگوریتم‌های فعال:                              ║');
+      print('║   • Multi-Head Attention                               ║');
+      print('║   • Transformer Encoder (6 layers)                     ║');
+      print('║   • BERT-like Contextual Embeddings                    ║');
+      print('║   • Semantic Reasoning Engine                          ║');
+      print('║   • Advanced Dialogue Manager                          ║');
+      print('║   • Knowledge Graph with 500+ entities                 ║');
+      print('║   • Reinforcement Learning (Q-Learning)                ║');
+      print('║   • Meta-Learning (Learning to Learn)                  ║');
+      print('║   • Multi-Task Learning                                ║');
+      print('║   • Dependency Parsing                                 ║');
+      print('║   • Coreference Resolution                             ║');
+      print('║   • Advanced Intent Classification                     ║');
+      print('╚═══════════════════════════════════════════════════════╝\n');
+    } catch (e, stackTrace) {
+      print('❌ خطا در مقداردهی موتور پیشرفته: $e');
+      print('Stack trace: $stackTrace');
+      _isInitialized = false;
+    }
   }
 
   void _preloadKnowledge() {
+    _knowledgeGraph.addRelation('minilang', 'has_type', 'int');
+    _knowledgeGraph.addRelation('minilang', 'has_type', 'float');
+    _knowledgeGraph.addRelation('minilang', 'has_type', 'string');
+    _knowledgeGraph.addRelation('minilang', 'has_type', 'boolean');
+    _knowledgeGraph.addRelation('minilang', 'has_type', 'var');
+    _knowledgeGraph.addRelation('minilang', 'has_type', 'const');
+
     _knowledgeGraph.addRelation('compiler', 'has_phase', 'lexical_analysis');
     _knowledgeGraph.addRelation('compiler', 'has_phase', 'syntax_analysis');
     _knowledgeGraph.addRelation('compiler', 'has_phase', 'semantic_analysis');
@@ -85,100 +98,137 @@ class AdvancedMLNLPEngine {
   }) async {
     print('\n🔬 شروع تحلیل فوق پیشرفته...');
 
-    final tokens = _advancedTokenizer.tokenize(text);
-    print('  ✓ توکنایز: ${tokens.length} توکن');
+    try {
+      final tokens = _advancedTokenizer.tokenize(text);
+      print('  ✓ توکنایز: ${tokens.length} توکن');
 
-    // Contextual Embeddings (BERT-like)
-    final contextualEmbeddings = await _bertEncoder.encode(tokens);
-    print('  ✓ Contextual Embeddings: ${contextualEmbeddings.length}x${contextualEmbeddings.first.dimension}');
+      // Contextual Embeddings (BERT-like)
+      final contextualEmbeddings = await _bertEncoder.encode(tokens);
+      print('  ✓ Contextual Embeddings: ${contextualEmbeddings.length}x${contextualEmbeddings.isNotEmpty ? contextualEmbeddings.first.dimension : 0}');
 
-    // Self-Attention Analysis
-    final attentionWeights = _attention.multiHeadAttention(
-      contextualEmbeddings,
-      numHeads: 8,
-    );
-    print('  ✓ Attention Weights محاسبه شد');
+      // Self-Attention Analysis
+      final attentionWeights = _attention.multiHeadAttention(
+        contextualEmbeddings,
+        numHeads: 8,
+      );
+      print('  ✓ Attention Weights محاسبه شد');
 
-    // Transformer Encoding
-    final transformerOutput = await _transformer.encode(contextualEmbeddings);
-    print('  ✓ Transformer Encoding: ${transformerOutput.hiddenStates.length} layers');
+      // Transformer Encoding
+      final transformerOutput = await _transformer.encode(contextualEmbeddings);
+      print('  ✓ Transformer Encoding: ${transformerOutput.hiddenStates.length} layers');
 
-    // Dependency Parsing
-    final dependencies = _dependencyParser.parse(tokens);
-    print('  ✓ Dependency Tree: ${dependencies.relations.length} روابط');
+      // Dependency Parsing
+      final dependencies = _dependencyParser.parse(tokens);
+      print('  ✓ Dependency Tree: ${dependencies.relations.length} روابط');
 
-    // Coreference Resolution
-    final coreferences = _corefResolver.resolve(tokens, conversationHistory ?? []);
-    print('  ✓ Coreference Chains: ${coreferences.chains.length}');
+      // Coreference Resolution
+      final coreferences = _corefResolver.resolve(tokens, conversationHistory ?? []);
+      print('  ✓ Coreference Chains: ${coreferences.chains.length}');
 
-    // Intent Classification (Multi-label)
-    final intents = await _intentClassifier.classify(transformerOutput.finalHidden);
-    print('  ✓ Intents: ${intents.map((i) => i.label).join(", ")}');
+      // Intent Classification (Multi-label) - اصلاح شده
+      final intents = await _intentClassifier.classify(transformerOutput.finalHidden, text);
+      print('  ✓ Intents: ${intents.isNotEmpty ? intents.map((i) => i.label).join(", ") : "None detected"}');
 
-    // Semantic Reasoning
-    final reasoning = await _semanticReasoner.reason(
-      text: text,
-      knowledgeGraph: _knowledgeGraph,
-      dependencies: dependencies,
-    );
-    print('  ✓ Semantic Inferences: ${reasoning.inferences.length}');
+      // Semantic Reasoning
+      final reasoning = await _semanticReasoner.reason(
+        text: text,
+        knowledgeGraph: _knowledgeGraph,
+        dependencies: dependencies,
+      );
+      print('  ✓ Semantic Inferences: ${reasoning.inferences.length}');
 
-    // Dialogue State Tracking
-    final dialogueState = _dialogueManager.updateState(
-      userUtterance: text,
-      intents: intents,
-      entities: reasoning.extractedEntities,
-    );
-    print('  ✓ Dialogue State: ${dialogueState.currentTopic}');
+      // Dialogue State Tracking
+      final dialogueState = _dialogueManager.updateState(
+        userUtterance: text,
+        intents: intents,
+        entities: reasoning.extractedEntities,
+      );
+      print('  ✓ Dialogue State: ${dialogueState.currentTopic}');
 
-    // Contextual Memory Update
-    _contextualMemory.add(MemoryItem(
-      text: text,
-      embeddings: contextualEmbeddings,
-      timestamp: DateTime.now(),
-      importance: _calculateImportance(intents, reasoning),
-    ));
-    print('  ✓ Memory Updated: ${_contextualMemory.size} items');
+      // Contextual Memory Update
+      if (contextualEmbeddings.isNotEmpty) {
+        _contextualMemory.add(MemoryItem(
+          text: text,
+          embeddings: contextualEmbeddings,
+          timestamp: DateTime.now(),
+          importance: _calculateImportance(intents, reasoning),
+        ));
+        print('  ✓ Memory Updated: ${_contextualMemory.size} items');
+      }
 
-    return UltraAdvancedAnalysis(
-      tokens: tokens,
-      contextualEmbeddings: contextualEmbeddings,
-      attentionWeights: attentionWeights,
-      transformerOutput: transformerOutput,
-      dependencies: dependencies,
-      coreferences: coreferences,
-      intents: intents,
-      reasoning: reasoning,
-      dialogueState: dialogueState,
-      relevantMemories: _contextualMemory.retrieve(contextualEmbeddings.first, topK: 5),
-    );
+      return UltraAdvancedAnalysis(
+        tokens: tokens,
+        contextualEmbeddings: contextualEmbeddings,
+        attentionWeights: attentionWeights,
+        transformerOutput: transformerOutput,
+        dependencies: dependencies,
+        coreferences: coreferences,
+        intents: intents,
+        reasoning: reasoning,
+        dialogueState: dialogueState,
+        relevantMemories: contextualEmbeddings.isNotEmpty
+            ? _contextualMemory.retrieve(contextualEmbeddings.first, topK: 5)
+            : [],
+      );
+    } catch (e, stackTrace) {
+      print('❌ خطا در تحلیل متن: $e');
+      print('Stack trace: $stackTrace');
+
+      return UltraAdvancedAnalysis(
+        tokens: [],
+        contextualEmbeddings: [],
+        attentionWeights: AttentionOutput(outputs: [], weights: [], numHeads: 0),
+        transformerOutput: TransformerOutput(
+          finalHidden: EmbeddingVector.zero(128),
+          hiddenStates: [],
+          attentionWeights: [],
+        ),
+        dependencies: DependencyTree(relations: [], tokens: []),
+        coreferences: CoreferenceResult(chains: [], mentions: []),
+        intents: [],
+        reasoning: SemanticReasoningResult(
+          inferences: [],
+          extractedEntities: [],
+          confidenceScore: 0.0,
+        ),
+        dialogueState: DialogueState(
+          currentTopic: 'unknown',
+          userMood: 'neutral',
+          conversationLength: 0,
+          topicFrequency: {},
+        ),
+        relevantMemories: [],
+      );
+    }
   }
 
   Future<void> learnFromFeedback({
     required String userMessage,
     required String response,
-    required double reward, // -1.0 to 1.0
+    required double reward,
     Map<String, dynamic>? context,
   }) async {
     print('\n🎓 یادگیری با Reinforcement Learning...');
 
-    final state = await _createState(userMessage, context);
+    try {
+      final state = await _createState(userMessage, context);
+      final action = _encodeAction(response);
 
-    final action = _encodeAction(response);
+      _reinforcementLearner.update(state, action, reward);
 
-    _reinforcementLearner.update(state, action, reward);
+      await _metaLearner.adapt(
+        taskPerformance: reward,
+        taskContext: context ?? {},
+      );
 
-    await _metaLearner.adapt(
-      taskPerformance: reward,
-      taskContext: context ?? {},
-    );
+      _multiTaskLearner.updateTask('response_generation', reward);
 
-    // Multi-Task Learning
-    _multiTaskLearner.updateTask('response_generation', reward);
-
-    print('  ✓ Q-Value updated');
-    print('  ✓ Meta-parameters adjusted');
-    print('  ✓ Multi-task weights updated');
+      print('  ✓ Q-Value updated');
+      print('  ✓ Meta-parameters adjusted');
+      print('  ✓ Multi-task weights updated');
+    } catch (e) {
+      print('❌ خطا در یادگیری: $e');
+    }
   }
 
   Future<AdvancedResponse> generateResponse(
@@ -187,57 +237,72 @@ class AdvancedMLNLPEngine {
       }) async {
     print('\n🎨 تولید پاسخ هوشمند...');
 
-    final relevantKnowledge = _knowledgeGraph.query(
-      entities: analysis.reasoning.extractedEntities,
-      maxHops: 3,
-    );
+    try {
+      final relevantKnowledge = _knowledgeGraph.query(
+        entities: analysis.reasoning.extractedEntities,
+        maxHops: 3,
+      );
 
-    final contextualInfo = _buildContextualInfo(analysis.relevantMemories);
+      final contextualInfo = _buildContextualInfo(analysis.relevantMemories);
 
-    final responseTemplate = _selectResponseTemplate(
-      intents: analysis.intents,
-      state: analysis.dialogueState,
-      strategy: strategy,
-    );
+      final responseTemplate = _selectResponseTemplate(
+        intents: analysis.intents,
+        state: analysis.dialogueState,
+        strategy: strategy,
+      );
 
-    var responseText = _generateContent(
-      template: responseTemplate,
-      knowledge: relevantKnowledge,
-      context: contextualInfo,
-      reasoning: analysis.reasoning,
-    );
+      var responseText = _generateContent(
+        template: responseTemplate,
+        knowledge: relevantKnowledge,
+        context: contextualInfo,
+        reasoning: analysis.reasoning,
+      );
 
-    // Transformer
-    responseText = await _enhanceWithTransformer(responseText, analysis);
+      responseText = await _enhanceWithTransformer(responseText, analysis);
+      responseText = _postProcess(responseText, analysis.dialogueState);
 
-    // Post-processing و نهایی‌سازی
-    responseText = _postProcess(responseText, analysis.dialogueState);
-
-    return AdvancedResponse(
-      text: responseText,
-      confidence: _calculateConfidence(analysis),
-      knowledgeUsed: relevantKnowledge,
-      reasoning: analysis.reasoning.inferences,
-      suggestedFollowUps: _generateFollowUpSuggestions(analysis),
-    );
+      return AdvancedResponse(
+        text: responseText,
+        confidence: _calculateConfidence(analysis),
+        knowledgeUsed: relevantKnowledge,
+        reasoning: analysis.reasoning.inferences,
+        suggestedFollowUps: _generateFollowUpSuggestions(analysis),
+      );
+    } catch (e) {
+      print('❌ خطا در تولید پاسخ: $e');
+      return AdvancedResponse(
+        text: 'متاسفانه در تولید پاسخ خطایی رخ داد. لطفاً سوال خود را واضح‌تر بیان کنید.',
+        confidence: 0.1,
+        knowledgeUsed: [],
+        reasoning: [],
+        suggestedFollowUps: [],
+      );
+    }
   }
 
   double _calculateImportance(List<Intent> intents, SemanticReasoningResult reasoning) {
     double importance = 0.5;
 
-    // Intent
-    for (var intent in intents) {
-      importance += intent.confidence * 0.3;
+    if (intents.isNotEmpty) {
+      for (var intent in intents) {
+        importance += intent.confidence * 0.3;
+      }
     }
 
+    //inferences
     importance += min(reasoning.inferences.length * 0.1, 0.3);
 
     return importance.clamp(0.0, 1.0);
   }
 
   Future<List<double>> _createState(String message, Map<String, dynamic>? context) async {
-    final analysis = await analyzeText(message);
-    return analysis.transformerOutput.finalHidden.values;
+    try {
+      final analysis = await analyzeText(message);
+      return analysis.transformerOutput.finalHidden.values;
+    } catch (e) {
+      print('خطا در ایجاد state: $e');
+      return List.filled(64, 0.0);
+    }
   }
 
   List<double> _encodeAction(String response) {
@@ -247,7 +312,6 @@ class AdvancedMLNLPEngine {
 
   String _buildContextualInfo(List<MemoryItem> memories) {
     if (memories.isEmpty) return '';
-
     return memories.map((m) => m.text).take(3).join(' ');
   }
 
@@ -296,6 +360,7 @@ class AdvancedMLNLPEngine {
   String _translateRelation(String relation) {
     const translations = {
       'has_phase': 'شامل مرحله',
+      'has_type': 'دارای نوع',
       'produces': 'تولید می‌کند',
       'uses': 'استفاده می‌کند از',
       'creates': 'ایجاد می‌کند',
@@ -305,7 +370,6 @@ class AdvancedMLNLPEngine {
   }
 
   Future<String> _enhanceWithTransformer(String text, UltraAdvancedAnalysis analysis) async {
-
     return text;
   }
 
@@ -319,13 +383,19 @@ class AdvancedMLNLPEngine {
   double _calculateConfidence(UltraAdvancedAnalysis analysis) {
     double confidence = 0.0;
 
-    final avgAttention = analysis.attentionWeights.weights.fold(0.0, (a, b) => a + b) /
-        analysis.attentionWeights.weights.length;
-    confidence += avgAttention * 0.3;
+    // Attention weights
+    if (analysis.attentionWeights.weights.isNotEmpty) {
+      final avgAttention = analysis.attentionWeights.weights.fold(0.0, (a, b) => a + b) /
+          analysis.attentionWeights.weights.length;
+      confidence += avgAttention * 0.3;
+    }
 
-    confidence += analysis.intents.fold(0.0, (sum, i) => sum + i.confidence) /
-        analysis.intents.length * 0.4;
+    if (analysis.intents.isNotEmpty) {
+      confidence += analysis.intents.fold(0.0, (sum, i) => sum + i.confidence) /
+          analysis.intents.length * 0.4;
+    }
 
+    // Reasoning inferences
     confidence += min(analysis.reasoning.inferences.length * 0.1, 0.3);
 
     return confidence.clamp(0.0, 1.0);
@@ -360,11 +430,14 @@ class AdvancedMLNLPEngine {
 }
 
 class AttentionMechanism {
-  //Self-Attention
   AttentionOutput multiHeadAttention(
       List<EmbeddingVector> embeddings, {
         required int numHeads,
       }) {
+    if (embeddings.isEmpty) {
+      return AttentionOutput(outputs: [], weights: [], numHeads: 0);
+    }
+
     final headSize = embeddings.first.dimension ~/ numHeads;
     final allHeadOutputs = <List<EmbeddingVector>>[];
 
@@ -373,7 +446,6 @@ class AttentionMechanism {
       allHeadOutputs.add(headOutput);
     }
 
-    // Concatenate heads
     final weights = _calculateAttentionWeights(embeddings);
 
     return AttentionOutput(
@@ -395,7 +467,10 @@ class AttentionMechanism {
     for (int i = 0; i < n; i++) {
       for (int j = 0; j < n; j++) {
         scores[i][j] = _dotProduct(embeddings[i], embeddings[j]);
-        scores[i][j] /= sqrt(embeddings[i].dimension);
+        final sqrtDim = sqrt(embeddings[i].dimension.toDouble());
+        if (sqrtDim > 0) {
+          scores[i][j] /= sqrtDim;
+        }
       }
       scores[i] = _softmax(scores[i]);
     }
@@ -430,12 +505,15 @@ class AttentionMechanism {
   }
 
   List<double> _softmax(List<double> values) {
+    if (values.isEmpty) return [];
     final expValues = values.map((v) => exp(v)).toList();
     final sum = expValues.reduce((a, b) => a + b);
+    if (sum == 0) return List.filled(values.length, 0.0);
     return expValues.map((v) => v / sum).toList();
   }
 
   List<double> _calculateAttentionWeights(List<EmbeddingVector> embeddings) {
+    if (embeddings.isEmpty) return [];
     return List.generate(embeddings.length, (i) => 1.0 / embeddings.length);
   }
 }
@@ -458,18 +536,22 @@ class TransformerEncoder {
   }
 
   Future<TransformerOutput> encode(List<EmbeddingVector> inputs) async {
+    if (inputs.isEmpty) {
+      return TransformerOutput(
+        finalHidden: EmbeddingVector.zero(dModel),
+        hiddenStates: [],
+        attentionWeights: [],
+      );
+    }
+
     var currentLayer = inputs;
     final hiddenStates = <List<EmbeddingVector>>[];
 
     for (int layer = 0; layer < numLayers; layer++) {
       final attentionOut = _attention.multiHeadAttention(currentLayer, numHeads: numHeads);
-
       currentLayer = _addAndNorm(currentLayer, attentionOut.outputs);
-
       final ffnOut = _ffnLayers[layer].forward(currentLayer);
-
       currentLayer = _addAndNorm(currentLayer, ffnOut);
-
       hiddenStates.add(List.from(currentLayer));
     }
 
@@ -553,6 +635,8 @@ class BERTLikeEncoder {
   }
 
   Future<List<EmbeddingVector>> encode(List<String> tokens) async {
+    if (tokens.isEmpty) return [];
+
     final tokenEmbs = tokens.map((token) => _getOrCreateEmbedding(token)).toList();
 
     final withPosition = <EmbeddingVector>[];
@@ -565,7 +649,7 @@ class BERTLikeEncoder {
     }
 
     final output = await _encoder.encode(withPosition);
-    return output.hiddenStates.last;
+    return output.hiddenStates.isNotEmpty ? output.hiddenStates.last : [];
   }
 
   EmbeddingVector _getOrCreateEmbedding(String token) {
@@ -673,19 +757,21 @@ class DialogueManager {
 
   String _detectTopic(List<Intent> intents, List<String> entities) {
 
-    if (entities.contains('compiler') || entities.contains('lexer')) {
-
+    if (entities.contains('minilang') ||
+        entities.contains('int') ||
+        entities.contains('float') ||
+        entities.contains('string') ||
+        entities.contains('boolean')) {
+      return 'minilang_types';
+    } else if (entities.contains('compiler') || entities.contains('lexer')) {
       return 'compiler_theory';
     } else if (entities.contains('parser') || entities.contains('ast')) {
-
       return 'parsing';
     } else if (entities.contains('optimization')) {
-
       return 'code_optimization';
     }
 
     for (var intent in intents) {
-
       if (intent.label == 'troubleshooting') return 'problem_solving';
       if (intent.label == 'example') return 'learning';
     }
@@ -819,7 +905,6 @@ class ReinforcementLearner {
     final currentQ = _qTable[stateKey]![actionKey] ?? 0.0;
     final maxFutureQ = _getMaxQ(stateKey);
 
-    // Q-Learning update rule
     final newQ = currentQ + alpha * (reward + gamma * maxFutureQ - currentQ);
     _qTable[stateKey]![actionKey] = newQ;
 
@@ -850,7 +935,6 @@ class MultiTaskLearner {
     }
 
     _tasks[taskName]!.addPerformance(performance);
-
     _rebalanceWeights();
   }
 
@@ -950,7 +1034,6 @@ class DependencyParser {
     final relations = <DependencyRelation>[];
 
     for (int i = 0; i < tokens.length - 1; i++) {
-
       if (_isVerb(tokens[i]) && _isNoun(tokens[i + 1])) {
         relations.add(DependencyRelation(
           head: tokens[i],
@@ -979,8 +1062,7 @@ class DependencyParser {
   }
 
   bool _isNoun(String token) {
-    // لیست ساده اسامی
-    const nouns = ['compiler', 'lexer', 'parser', 'کامپایلر', 'برنامه'];
+    const nouns = ['compiler', 'lexer', 'parser', 'کامپایلر', 'برنامه', 'minilang', 'نوع', 'داده'];
     return nouns.contains(token) || token.length > 3;
   }
 }
@@ -994,7 +1076,6 @@ class CoreferenceResolver {
 
     for (int i = 0; i < tokens.length; i++) {
       if (pronouns.contains(tokens[i])) {
-
         final antecedent = _findAntecedent(tokens, i, history);
         if (antecedent != null) {
           chains.add(CoreferenceChain(
@@ -1010,7 +1091,6 @@ class CoreferenceResolver {
   }
 
   String? _findAntecedent(List<String> tokens, int pronounIndex, List<String> history) {
-
     for (int i = pronounIndex - 1; i >= 0; i--) {
       if (tokens[i].length > 3 && !_isPronoun(tokens[i])) {
         return tokens[i];
@@ -1018,7 +1098,6 @@ class CoreferenceResolver {
     }
 
     if (history.isNotEmpty) {
-
       final lastMsg = history.last.split(RegExp(r'\s+'));
       return lastMsg.firstWhere(
             (w) => w.length > 3 && !_isPronoun(w),
@@ -1035,32 +1114,52 @@ class CoreferenceResolver {
   }
 }
 
+// IntentClassifier
 class IntentClassifier {
   final Map<String, List<String>> _intentPatterns = {
-    'definition': ['چیست', 'تعریف', 'معنی', 'what is', 'define'],
+    'definition': ['چیست', 'تعریف', 'معنی', 'what is', 'define', 'نوع', 'انواع'],
     'example': ['مثال', 'نمونه', 'example', 'sample', 'show me'],
     'explanation': ['چطور', 'چگونه', 'توضیح', 'how', 'explain', 'why'],
     'comparison': ['تفاوت', 'مقایسه', 'difference', 'compare', 'versus'],
     'troubleshooting': ['مشکل', 'خطا', 'error', 'problem', 'fix', 'debug'],
     'listing': ['لیست', 'فهرست', 'list', 'enumerate'],
+    'data_types': ['داده', 'نوع', 'type', 'int', 'float', 'string', 'boolean'],
   };
 
-  Future<List<Intent>> classify(EmbeddingVector embedding) async {
+  Future<List<Intent>> classify(EmbeddingVector embedding, String text) async {
     final intents = <Intent>[];
+    final lowerText = text.toLowerCase();
 
+    // pattern-based
     for (var entry in _intentPatterns.entries) {
-      final score = Random().nextDouble() * 0.3 + 0.1; // شبیه‌سازی
+      double score = 0.0;
 
-      if (score > 0.15) {
+      for (var keyword in entry.value) {
+        if (lowerText.contains(keyword.toLowerCase())) {
+          score += 0.3;
+        }
+      }
+
+      score += Random().nextDouble() * 0.2;
+
+      if (score > 0.2) {
         intents.add(Intent(
           label: entry.key,
-          confidence: score,
+          confidence: min(score, 1.0),
           keywords: entry.value,
         ));
       }
     }
 
     intents.sort((a, b) => b.confidence.compareTo(a.confidence));
+
+    if (intents.isEmpty) {
+      intents.add(Intent(
+        label: 'general',
+        confidence: 0.5,
+        keywords: [],
+      ));
+    }
 
     return intents.take(3).toList();
   }

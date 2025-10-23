@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/compiler_provider.dart';
+import 'dart:ui';
 
 class ExampleCodeSelector extends StatefulWidget {
   final VoidCallback? onExampleSelected;
@@ -10,11 +11,14 @@ class ExampleCodeSelector extends StatefulWidget {
   State<ExampleCodeSelector> createState() => _ExampleCodeSelectorState();
 }
 
-class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
+class _ExampleCodeSelectorState extends State<ExampleCodeSelector> with TickerProviderStateMixin {
   String? _lastLoadedExample;
   String _selectedCategory = 'All';
+  late AnimationController _pulseController;
+  late AnimationController _slideController;
 
   static const examples = [
+    // Basic Examples
     {
       'name': 'simple',
       'title': 'Hello World',
@@ -23,26 +27,6 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'difficulty': 'Beginner',
       'color': Colors.green,
       'estimatedLines': 8,
-      'category': 'Basic',
-    },
-    {
-      'name': 'fibonacci',
-      'title': 'Fibonacci',
-      'description': 'Recursive function with mathematical sequence',
-      'icon': Icons.functions,
-      'difficulty': 'Intermediate',
-      'color': Colors.orange,
-      'estimatedLines': 15,
-      'category': 'Basic',
-    },
-    {
-      'name': 'array',
-      'title': 'Array Operations',
-      'description': 'Array declaration, assignment and loops',
-      'icon': Icons.list,
-      'difficulty': 'Beginner',
-      'color': Colors.blue,
-      'estimatedLines': 12,
       'category': 'Basic',
     },
     {
@@ -56,15 +40,26 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'category': 'Basic',
     },
     {
+      'name': 'array',
+      'title': 'Array Operations',
+      'description': 'Array declaration, assignment and loops',
+      'icon': Icons.list,
+      'difficulty': 'Beginner',
+      'color': Colors.blue,
+      'estimatedLines': 12,
+      'category': 'Basic',
+    },
+    {
       'name': 'loop',
       'title': 'For Loop',
       'description': 'Iteration and loop constructs',
       'icon': Icons.loop,
-      'difficulty': 'Intermediate',
+      'difficulty': 'Beginner',
       'color': Colors.cyan,
       'estimatedLines': 16,
       'category': 'Basic',
     },
+    // Control Flow
     {
       'name': 'do_while',
       'title': 'Do-While Loop',
@@ -73,7 +68,7 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'difficulty': 'Beginner',
       'color': Colors.teal,
       'estimatedLines': 10,
-      'category': 'New Features',
+      'category': 'Control Flow',
       'badge': 'NEW',
     },
     {
@@ -84,7 +79,7 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'difficulty': 'Beginner',
       'color': Colors.indigo,
       'estimatedLines': 22,
-      'category': 'New Features',
+      'category': 'Control Flow',
       'badge': 'NEW',
     },
     {
@@ -95,9 +90,10 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'difficulty': 'Intermediate',
       'color': Colors.deepOrange,
       'estimatedLines': 20,
-      'category': 'New Features',
+      'category': 'Control Flow',
       'badge': 'NEW',
     },
+    // Functions
     {
       'name': 'lambda',
       'title': 'Lambda Functions',
@@ -106,7 +102,7 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'difficulty': 'Intermediate',
       'color': Colors.pink,
       'estimatedLines': 14,
-      'category': 'New Features',
+      'category': 'Functions',
       'badge': 'NEW',
     },
     {
@@ -114,11 +110,10 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'title': 'Advanced Lambda',
       'description': 'Higher-order functions with lambdas',
       'icon': Icons.functions_rounded,
-      'difficulty': 'Advanced',
+      'difficulty': 'Intermediate',
       'color': Colors.deepPurple,
       'estimatedLines': 16,
-      'category': 'New Features',
-      'badge': 'NEW',
+      'category': 'Functions',
     },
     {
       'name': 'recursive',
@@ -128,8 +123,87 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       'difficulty': 'Intermediate',
       'color': Colors.amber,
       'estimatedLines': 18,
-      'category': 'Advanced',
+      'category': 'Functions',
     },
+    {
+      'name': 'fibonacci',
+      'title': 'Fibonacci',
+      'description': 'Recursive function with mathematical sequence',
+      'icon': Icons.functions,
+      'difficulty': 'Intermediate',
+      'color': Colors.orange,
+      'estimatedLines': 15,
+      'category': 'Functions',
+    },
+    // Math & Numbers
+    {
+      'name': 'math_simple',
+      'title': 'Simple Math',
+      'description': 'Basic arithmetic operations',
+      'icon': Icons.add_circle_outline,
+      'difficulty': 'Beginner',
+      'color': Colors.lightGreen,
+      'estimatedLines': 30,
+      'category': 'Math',
+      'badge': 'NEW',
+    },
+    {
+      'name': 'math_advanced',
+      'title': 'Advanced Math',
+      'description': 'GCD, LCM, Prime checking algorithms',
+      'icon': Icons.calculate,
+      'difficulty': 'Intermediate',
+      'color': Colors.lightBlue,
+      'estimatedLines': 45,
+      'category': 'Math',
+      'badge': 'NEW',
+    },
+    {
+      'name': 'calculator',
+      'title': 'Calculator',
+      'description': 'Simple calculator with operations',
+      'icon': Icons.dialpad,
+      'difficulty': 'Beginner',
+      'color': Colors.blueGrey,
+      'estimatedLines': 40,
+      'category': 'Math',
+      'badge': 'NEW',
+    },
+    {
+      'name': 'number_games',
+      'title': 'Number Games',
+      'description': 'Find max/min, sum range, count numbers',
+      'icon': Icons.casino,
+      'difficulty': 'Intermediate',
+      'color': Colors.lime,
+      'estimatedLines': 50,
+      'category': 'Math',
+      'badge': 'NEW',
+    },
+    // String & Patterns
+    {
+      'name': 'string_operations',
+      'title': 'String Operations',
+      'description': 'String concatenation and manipulation',
+      'icon': Icons.abc,
+      'difficulty': 'Beginner',
+      'color': Colors.brown,
+      'estimatedLines': 35,
+      'category': 'String',
+      'badge': 'NEW',
+    },
+    {
+      'name': 'pattern_printing',
+      'title': 'Pattern Printing',
+      'description': 'Stars, triangles, and countdown patterns',
+      'icon': Icons.grid_4x4,
+      'difficulty': 'Beginner',
+      'color': Colors.grey,
+      'estimatedLines': 45,
+      'category': 'String',
+      'badge': 'NEW',
+    },
+    // Combined
     {
       'name': 'combined',
       'title': 'Combined Features',
@@ -144,6 +218,27 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Selector<CompilerProvider, _CompilerUIState>(
       selector: (_, provider) => _CompilerUIState(
@@ -156,40 +251,75 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
   }
 
   Widget _buildContent(_CompilerUIState state) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Header(isCacheEnabled: state.isCacheEnabled),
-            const SizedBox(height: 20),
-            if (state.isCacheEnabled)
-              _CacheStatusBadge(hitRate: state.cacheStats['hitRate'] ?? '0%'),
-            if (state.isCacheEnabled) const SizedBox(height: 16),
-            _CategoryTabs(
-              selectedCategory: _selectedCategory,
-              isDisabled: state.isCompiling,
-              onCategoryChanged: (category) {
-                setState(() => _selectedCategory = category);
-              },
-            ),
-            const SizedBox(height: 16),
-            _ExampleGrid(
-              selectedCategory: _selectedCategory,
-              lastLoadedExample: _lastLoadedExample,
-              isDisabled: state.isCompiling,
-              onExampleSelected: _loadExample,
-            ),
-            if (_lastLoadedExample != null) ...[
-              const SizedBox(height: 16),
-              _LastLoadedInfo(exampleName: _lastLoadedExample!),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.blue.shade50.withOpacity(0.3),
+            Colors.purple.shade50.withOpacity(0.3),
           ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Card(
+            elevation: 0,
+            color: Colors.white.withOpacity(0.9),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Header(
+                    isCacheEnabled: state.isCacheEnabled,
+                    totalExamples: examples.length,
+                    pulseController: _pulseController,
+                  ),
+                  const SizedBox(height: 24),
+                  if (state.isCacheEnabled)
+                    _CacheStatusBadge(
+                      hitRate: state.cacheStats['hitRate'] ?? '0%',
+                      pulseController: _pulseController,
+                    ),
+                  if (state.isCacheEnabled) const SizedBox(height: 20),
+                  _CategoryTabs(
+                    selectedCategory: _selectedCategory,
+                    isDisabled: state.isCompiling,
+                    onCategoryChanged: (category) {
+                      setState(() => _selectedCategory = category);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _ExampleGrid(
+                    selectedCategory: _selectedCategory,
+                    lastLoadedExample: _lastLoadedExample,
+                    isDisabled: state.isCompiling,
+                    onExampleSelected: _loadExample,
+                  ),
+                  if (_lastLoadedExample != null) ...[
+                    const SizedBox(height: 20),
+                    _LastLoadedInfo(exampleName: _lastLoadedExample!),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -197,12 +327,9 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
 
   void _loadExample(String name, String title) {
     final provider = context.read<CompilerProvider>();
-
     provider.loadExampleCode(name);
-
     setState(() => _lastLoadedExample = name);
 
-    // FIXED: Safe firstWhere with orElse
     final example = examples.firstWhere(
           (e) => e['name'] == name,
       orElse: () => {
@@ -219,7 +346,14 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
       SnackBar(
         content: Row(
           children: [
-            Icon(example['icon'] as IconData, color: Colors.white, size: 20),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(example['icon'] as IconData, color: Colors.white, size: 20),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -228,11 +362,12 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
                 children: [
                   Text(
                     'Loaded: $title',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    '${example['difficulty']} - ~${example['estimatedLines']} lines',
-                    style: const TextStyle(fontSize: 12),
+                    '${example['difficulty']} • ~${example['estimatedLines']} lines',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                 ],
               ),
@@ -240,12 +375,12 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
           ],
         ),
         backgroundColor: example['color'] as Color,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         action: SnackBarAction(
-          label: 'Compile',
+          label: 'Compile Now',
           textColor: Colors.white,
           onPressed: () {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -256,9 +391,7 @@ class _ExampleCodeSelectorState extends State<ExampleCodeSelector> {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        widget.onExampleSelected?.call();
-      }
+      if (mounted) widget.onExampleSelected?.call();
     });
   }
 }
@@ -289,48 +422,127 @@ class _CompilerUIState {
 
 class _Header extends StatelessWidget {
   final bool isCacheEnabled;
+  final int totalExamples;
+  final AnimationController pulseController;
 
-  const _Header({required this.isCacheEnabled});
+  const _Header({
+    required this.isCacheEnabled,
+    required this.totalExamples,
+    required this.pulseController,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(8),
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade400, Colors.blue.shade600],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Icon(Icons.library_books, size: 24, color: Colors.blue.shade600),
+          child: const Icon(Icons.library_books, size: 28, color: Colors.white),
         ),
-        const SizedBox(width: 12),
-        const Expanded(
+        const SizedBox(width: 16),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'Example Code Library',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                ),
               ),
-              Text(
-                'Choose from 12 examples • New features available!',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome, size: 12, color: Colors.green.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$totalExamples examples',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.fiber_new, size: 12, color: Colors.orange.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          '6 new added!',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
         if (isCacheEnabled)
-          Tooltip(
-            message: 'Smart caching enabled',
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(Icons.flash_on, size: 16, color: Colors.green.shade600),
-            ),
+          AnimatedBuilder(
+            animation: pulseController,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: 1.0 + (pulseController.value * 0.1),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade400, Colors.green.shade600],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.4),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.flash_on, size: 20, color: Colors.white),
+                ),
+              );
+            },
           ),
       ],
     );
@@ -339,33 +551,62 @@ class _Header extends StatelessWidget {
 
 class _CacheStatusBadge extends StatelessWidget {
   final String hitRate;
+  final AnimationController pulseController;
 
-  const _CacheStatusBadge({required this.hitRate});
+  const _CacheStatusBadge({
+    required this.hitRate,
+    required this.pulseController,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade200),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.speed, size: 16, color: Colors.blue.shade600),
-          const SizedBox(width: 8),
-          Text(
-            'Cache Hit Rate: $hitRate',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.blue.shade800,
-              fontWeight: FontWeight.w500,
+    return AnimatedBuilder(
+      animation: pulseController,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.blue.shade50,
+                Colors.blue.shade100.withOpacity(0.5 + pulseController.value * 0.5),
+              ],
             ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade300, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.speed, size: 18, color: Colors.blue.shade700),
+              const SizedBox(width: 10),
+              Text(
+                'Cache Hit Rate: ',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.blue.shade800,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                hitRate,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.blue.shade900,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -381,7 +622,7 @@ class _CategoryTabs extends StatelessWidget {
     required this.onCategoryChanged,
   });
 
-  static const categories = ['All', 'Basic', 'New Features', 'Advanced'];
+  static const categories = ['All', 'Basic', 'Control Flow', 'Functions', 'Math', 'String', 'Advanced'];
 
   @override
   Widget build(BuildContext context) {
@@ -397,13 +638,72 @@ class _CategoryTabs extends StatelessWidget {
               .length;
 
           return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text('$category ($count)'),
-              selected: isSelected,
-              onSelected: isDisabled ? null : (_) => onCategoryChanged(category),
-              selectedColor: Colors.blue.shade100,
-              checkmarkColor: Colors.blue.shade700,
+            padding: const EdgeInsets.only(right: 10),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isDisabled ? null : () => onCategoryChanged(category),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? LinearGradient(
+                        colors: [Colors.blue.shade400, Colors.blue.shade600],
+                      )
+                          : null,
+                      color: isSelected ? null : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? Colors.blue.shade600 : Colors.grey.shade300,
+                        width: isSelected ? 2 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          category,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? Colors.white : Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withOpacity(0.3)
+                                : Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           );
         }).toList(),
@@ -435,16 +735,16 @@ class _ExampleGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = (constraints.maxWidth / 160).floor().clamp(2, 4);
+        final crossAxisCount = (constraints.maxWidth / 170).floor().clamp(2, 4);
 
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.85,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.82,
           ),
           itemCount: filteredExamples.length,
           itemBuilder: (context, index) {
@@ -461,7 +761,7 @@ class _ExampleGrid extends StatelessWidget {
   }
 }
 
-class _ExampleCard extends StatelessWidget {
+class _ExampleCard extends StatefulWidget {
   final Map<String, dynamic> example;
   final bool isSelected;
   final bool isDisabled;
@@ -475,130 +775,276 @@ class _ExampleCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final name = example['name'] as String;
-    final title = example['title'] as String;
-    final description = example['description'] as String;
-    final icon = example['icon'] as IconData;
-    final difficulty = example['difficulty'] as String;
-    final color = example['color'] as Color;
-    final estimatedLines = example['estimatedLines'] as int;
-    final badge = example['badge'] as String?;
+  State<_ExampleCard> createState() => _ExampleCardState();
+}
 
-    return RepaintBoundary(
-      child: Material(
-        borderRadius: BorderRadius.circular(12),
-        color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
-        child: InkWell(
-          onTap: isDisabled ? null : () => onTap(name, title),
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isSelected
-                        ? color
-                        : isDisabled
-                        ? Colors.grey.shade300
-                        : Colors.grey.shade200,
-                    width: isSelected ? 2 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isDisabled
-                            ? Colors.grey.shade100
-                            : color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+class _ExampleCardState extends State<_ExampleCard> with SingleTickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.example['name'] as String;
+    final title = widget.example['title'] as String;
+    final description = widget.example['description'] as String;
+    final icon = widget.example['icon'] as IconData;
+    final difficulty = widget.example['difficulty'] as String;
+    final color = widget.example['color'] as Color;
+    final estimatedLines = widget.example['estimatedLines'] as int;
+    final badge = widget.example['badge'] as String?;
+
+    return MouseRegion(
+      onEnter: (_) {
+        if (!widget.isDisabled) {
+          setState(() => _isHovered = true);
+          _controller.forward();
+        }
+      },
+      onExit: (_) {
+        setState(() => _isHovered = false);
+        _controller.reverse();
+      },
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: RepaintBoundary(
+              child: Material(
+                borderRadius: BorderRadius.circular(16),
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.isDisabled ? null : () => widget.onTap(name, title),
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      gradient: widget.isSelected
+                          ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          color.withOpacity(0.15),
+                          color.withOpacity(0.05),
+                        ],
+                      )
+                          : null,
+                      color: widget.isSelected ? null : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: widget.isSelected
+                            ? color
+                            : _isHovered
+                            ? color.withOpacity(0.5)
+                            : Colors.grey.shade200,
+                        width: widget.isSelected ? 2.5 : 1.5,
                       ),
-                      child: Icon(
-                        icon,
-                        size: 24,
-                        color: isDisabled ? Colors.grey.shade400 : color,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isDisabled ? Colors.grey.shade400 : Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDisabled ? Colors.grey.shade400 : Colors.grey.shade600,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: _getDifficultyColor(difficulty).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            difficulty,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w500,
-                              color: _getDifficultyColor(difficulty),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '~$estimatedLines lines',
-                          style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.isSelected
+                              ? color.withOpacity(0.3)
+                              : _isHovered
+                              ? Colors.black.withOpacity(0.1)
+                              : Colors.black.withOpacity(0.05),
+                          blurRadius: widget.isSelected || _isHovered ? 12 : 6,
+                          offset: Offset(0, widget.isSelected || _isHovered ? 4 : 2),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              if (badge != null)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: badge == 'NEW' ? Colors.green : Colors.red,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      badge,
-                      style: const TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    child: Stack(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: widget.isDisabled
+                                        ? [Colors.grey.shade200, Colors.grey.shade300]
+                                        : [color.withOpacity(0.2), color.withOpacity(0.1)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: color.withOpacity(0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  icon,
+                                  size: 28,
+                                  color: widget.isDisabled ? Colors.grey.shade400 : color,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: widget.isDisabled ? Colors.grey.shade400 : Colors.black87,
+                                  letterSpacing: -0.3,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: widget.isDisabled ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  height: 1.3,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          _getDifficultyColor(difficulty).withOpacity(0.2),
+                                          _getDifficultyColor(difficulty).withOpacity(0.1),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: _getDifficultyColor(difficulty).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      difficulty,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: _getDifficultyColor(difficulty),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.code, size: 10, color: Colors.grey.shade600),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$estimatedLines',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (badge != null)
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: badge == 'NEW'
+                                      ? [Colors.green.shade400, Colors.green.shade600]
+                                      : [Colors.red.shade400, Colors.red.shade600],
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (badge == 'NEW' ? Colors.green : Colors.red)
+                                        .withOpacity(0.4),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                badge,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (widget.isSelected)
+                          Positioned(
+                            top: 10,
+                            left: 10,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withOpacity(0.5),
+                                    blurRadius: 6,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -629,29 +1075,84 @@ class _LastLoadedInfo extends StatelessWidget {
 
     if (example.isEmpty) return const SizedBox.shrink();
 
+    final color = example['color'] as Color;
+    final icon = example['icon'] as IconData;
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade200),
+        gradient: LinearGradient(
+          colors: [
+            Colors.green.shade50,
+            Colors.green.shade100.withOpacity(0.3),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade300, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(Icons.check_circle, size: 16, color: Colors.green.shade600),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Currently loaded: ${example['title']}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.green.shade800,
-                fontWeight: FontWeight.w500,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color.withOpacity(0.3), color.withOpacity(0.2)],
               ),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Currently Loaded',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.green.shade600,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  example['title'] as String,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.green.shade900,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade600,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.check_circle, size: 18, color: Colors.white),
           ),
         ],
       ),
     );
   }
 }
+
