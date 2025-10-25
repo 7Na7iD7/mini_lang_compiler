@@ -44,7 +44,8 @@ class CompilationPhase {
 
   @override
   String toString() {
-    final warningText = warnings.isNotEmpty ? ' (${warnings.length} warnings)' : '';
+    final warningText =
+        warnings.isNotEmpty ? ' (${warnings.length} warnings)' : '';
     final cachedText = wasCached ?? false ? ' [CACHED]' : '';
     return '$name: ${isSuccessful ?? false ? 'Success' : 'Failed'} (${duration.inMilliseconds}ms)$warningText$cachedText';
   }
@@ -57,7 +58,6 @@ class CompilerConfig {
   static const int maxConcurrentCompilations = 1;
 }
 
-// Data class for isolate communication
 class _CompilationData {
   final String sourceCode;
   final bool enableOptimization;
@@ -70,7 +70,6 @@ class _CompilationData {
   });
 }
 
-// Result class for isolate communication
 class _CompilationResult {
   final List<Map<String, dynamic>> tokensJson;
   final Map<String, dynamic>? astJson;
@@ -159,21 +158,38 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
   // Getters
   String get sourceCode => _sourceCode;
+
   CompilerState get state => _state;
+
   List<CompilationPhase> get phases => List.unmodifiable(_phases);
+
   String get output => _output;
+
   List<Token> get tokens => List.unmodifiable(_tokens);
+
   Program? get ast => _ast;
+
   Program? get optimizedAst => _optimizedAst;
+
   Map<String, dynamic>? get symbolTable => _symbolTable;
+
   List<String> get executionLog => List.unmodifiable(_executionLog);
-  Map<String, dynamic> get compilationStats => Map.unmodifiable(_compilationStats);
+
+  Map<String, dynamic> get compilationStats =>
+      Map.unmodifiable(_compilationStats);
+
   List<String> get suggestions => List.unmodifiable(_suggestions);
+
   bool get isRunning => _isRunning;
+
   bool get isCacheEnabled => _isCacheEnabled;
+
   bool get isOptimizationEnabled => _isOptimizationEnabled;
+
   OptimizerConfig get optimizerConfig => _optimizerConfig;
+
   Map<String, dynamic> get cacheStatistics => Map.unmodifiable(_cacheStats);
+
   int get executionTime => _executionTime;
 
   void setSourceCode(String value) {
@@ -210,15 +226,18 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     }
 
     if (_sourceCode.length > CompilerConfig.maxSourceCodeLength) {
-      _showError('Source code exceeds maximum length of ${CompilerConfig.maxSourceCodeLength} characters');
+      _showError(
+          'Source code exceeds maximum length of ${CompilerConfig.maxSourceCodeLength} characters');
       return;
     }
 
     _isRunning = true;
     _clearResults();
+    _state = CompilerState.lexing;
+    notifyListeners();
+
     final stopwatch = Stopwatch()..start();
 
-    // Check cache first
     try {
       if (_isCacheEnabled) {
         final cachedResult = await getCachedCompilation(_sourceCode);
@@ -228,12 +247,13 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         }
       }
 
-      // Perform full compilation in isolate with timeout
-      final result = await compute(_compileInIsolate, _CompilationData(
-        sourceCode: _sourceCode,
-        enableOptimization: _isOptimizationEnabled,
-        optimizerConfig: _optimizerConfig,
-      )).timeout(
+      final result = await compute(
+          _compileInIsolate,
+          _CompilationData(
+            sourceCode: _sourceCode,
+            enableOptimization: _isOptimizationEnabled,
+            optimizerConfig: _optimizerConfig,
+          )).timeout(
         Duration(milliseconds: CompilerConfig.maxCompilationTimeMs),
         onTimeout: () {
           throw TimeoutException('Compilation timeout exceeded');
@@ -242,21 +262,29 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
       await _handleCompilationResult(result, stopwatch);
     } on TimeoutException catch (e) {
+      stopwatch.stop();
       _showError('Compilation timeout: ${e.message}');
       _state = CompilerState.error;
       _isRunning = false;
       notifyListeners();
     } catch (e, stackTrace) {
+      stopwatch.stop();
       final errorMessage = e.toString().split('\n').first;
       _showError('Compilation failed: $errorMessage');
       debugPrint('Full compilation error: $e\n$stackTrace');
       _state = CompilerState.error;
       _isRunning = false;
       notifyListeners();
+    } finally {
+      if (_isRunning &&
+          (_state == CompilerState.error ||
+              _state == CompilerState.completed)) {
+        _isRunning = false;
+        notifyListeners();
+      }
     }
   }
 
-  // Static method for compute isolate - runs in background thread
   static _CompilationResult _compileInIsolate(_CompilationData data) {
     final stopwatch = Stopwatch()..start();
 
@@ -267,7 +295,11 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     final lexerDuration = DateTime.now().difference(lexerStart);
 
     final lexerErrors = lexer.hasErrors
-        ? lexer.getErrorsAsString().split('\n').where((e) => e.isNotEmpty).toList()
+        ? lexer
+            .getErrorsAsString()
+            .split('\n')
+            .where((e) => e.isNotEmpty)
+            .toList()
         : <String>[];
 
     if (lexer.hasErrors) {
@@ -299,22 +331,32 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     final parserDuration = DateTime.now().difference(parserStart);
 
     final parserErrors = parser.hasErrors
-        ? parser.getErrorsAsString().split('\n').where((e) => e.isNotEmpty).toList()
+        ? parser
+            .getErrorsAsString()
+            .split('\n')
+            .where((e) => e.isNotEmpty)
+            .toList()
         : <String>[];
 
     final parserWarnings = parser.hasWarnings
-        ? parser.getAllMessages().where((m) => m.type == MessageType.warning).map((w) => w.toString()).toList()
+        ? parser
+            .getAllMessages()
+            .where((m) => m.type == MessageType.warning)
+            .map((w) => w.toString())
+            .toList()
         : <String>[];
 
     if (ast == null || parser.hasErrors) {
       return _CompilationResult(
-        tokensJson: tokens.map((t) => {
-          'type': t.type.toString(),
-          'value': t.value,
-          'line': t.line,
-          'column': t.column,
-          'position': t.position,
-        }).toList(),
+        tokensJson: tokens
+            .map((t) => {
+                  'type': t.type.toString(),
+                  'value': t.value,
+                  'line': t.line,
+                  'column': t.column,
+                  'position': t.position,
+                })
+            .toList(),
         astJson: null,
         symbolTableJson: null,
         executionLogJson: [],
@@ -341,11 +383,19 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     final analyzerDuration = DateTime.now().difference(analyzerStart);
 
     final analyzerErrors = analyzer.hasErrors
-        ? analyzer.getErrorsAsString().split('\n').where((e) => e.isNotEmpty).toList()
+        ? analyzer
+            .getErrorsAsString()
+            .split('\n')
+            .where((e) => e.isNotEmpty)
+            .toList()
         : <String>[];
 
     final analyzerWarnings = analyzer.hasWarnings
-        ? analyzer.getWarningsAsString().split('\n').where((e) => e.isNotEmpty).toList()
+        ? analyzer
+            .getWarningsAsString()
+            .split('\n')
+            .where((e) => e.isNotEmpty)
+            .toList()
         : <String>[];
 
     final stats = analyzer.getStatistics();
@@ -353,13 +403,15 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
     if (analyzer.hasErrors) {
       return _CompilationResult(
-        tokensJson: tokens.map((t) => {
-          'type': t.type.toString(),
-          'value': t.value,
-          'line': t.line,
-          'column': t.column,
-          'position': t.position,
-        }).toList(),
+        tokensJson: tokens
+            .map((t) => {
+                  'type': t.type.toString(),
+                  'value': t.value,
+                  'line': t.line,
+                  'column': t.column,
+                  'position': t.position,
+                })
+            .toList(),
         astJson: ast.toJson(),
         symbolTableJson: symbolTable,
         executionLogJson: [],
@@ -386,7 +438,6 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     int optimizerDurationMs = 0;
 
     if (data.enableOptimization) {
-
       final optimizerStart = DateTime.now();
       final optimizer = Optimizer(config: data.optimizerConfig);
       final optimizationResult = optimizer.optimize(ast);
@@ -394,7 +445,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
       finalAst = optimizationResult.optimizedProgram;
       optimizationLog = optimizationResult.optimizations;
-      optimizerWarnings = optimizationResult.warnings.map((w) => w.toString()).toList();
+      optimizerWarnings =
+          optimizationResult.warnings.map((w) => w.toString()).toList();
       optimizationStats = optimizationResult.statistics;
       optimizerDurationMs = optimizerDuration.inMilliseconds;
     } else {
@@ -421,13 +473,15 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     final executionLog = interpreter.getExecutionLog();
 
     return _CompilationResult(
-      tokensJson: tokens.map((t) => {
-        'type': t.type.toString(),
-        'value': t.value,
-        'line': t.line,
-        'column': t.column,
-        'position': t.position,
-      }).toList(),
+      tokensJson: tokens
+          .map((t) => {
+                'type': t.type.toString(),
+                'value': t.value,
+                'line': t.line,
+                'column': t.column,
+                'position': t.position,
+              })
+          .toList(),
       astJson: ast.toJson(),
       optimizedAstJson: data.enableOptimization ? finalAst.toJson() : null,
       symbolTableJson: symbolTable,
@@ -507,19 +561,23 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     return count;
   }
 
-  Future<void> _handleCompilationResult(_CompilationResult result, Stopwatch stopwatch) async {
+  Future<void> _handleCompilationResult(
+      _CompilationResult result, Stopwatch stopwatch) async {
     _state = CompilerState.lexing;
     notifyListeners();
     await Future.delayed(Duration(milliseconds: 50));
 
     // Reconstruct tokens from JSON
-    _tokens = result.tokensJson.map((t) => Token(
-      type: TokenType.values.firstWhere((type) => type.toString() == t['type']),
-      value: t['value'],
-      line: t['line'],
-      column: t['column'],
-      position: t['position'],
-    )).toList();
+    _tokens = result.tokensJson
+        .map((t) => Token(
+              type: TokenType.values
+                  .firstWhere((type) => type.toString() == t['type']),
+              value: t['value'],
+              line: t['line'],
+              column: t['column'],
+              position: t['position'],
+            ))
+        .toList();
 
     _addPhase('Lexical Analysis', result.lexerErrors.isEmpty,
         _getTokensDisplayString(_tokens), result.lexerErrors,
@@ -539,9 +597,14 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       _ast = Program.fromJson(result.astJson!);
     }
 
-    _addPhase('Parsing', result.parserErrors.isEmpty && _ast != null,
-        _ast != null ? 'Parse tree generated with ${_countASTNodes(_ast!)} nodes' : 'Parse failed',
-        result.parserErrors, warnings: result.parserWarnings,
+    _addPhase(
+        'Parsing',
+        result.parserErrors.isEmpty && _ast != null,
+        _ast != null
+            ? 'Parse tree generated with ${_countASTNodes(_ast!)} nodes'
+            : 'Parse failed',
+        result.parserErrors,
+        warnings: result.parserWarnings,
         duration: Duration(milliseconds: result.parserDurationMs));
 
     if (_ast == null || result.parserErrors.isNotEmpty) {
@@ -556,22 +619,20 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     // Store symbol table
     _symbolTable = result.symbolTableJson;
 
-    _addPhase('Semantic Analysis', result.analyzerErrors.isEmpty,
+    _addPhase(
+        'Semantic Analysis',
+        result.analyzerErrors.isEmpty,
         'Symbols: ${result.stats['totalSymbols']}, Functions: ${result.stats['functions']}, Variables: ${result.stats['variables']}',
-        result.analyzerErrors, warnings: result.analyzerWarnings,
-        duration: Duration(milliseconds: result.analyzerDurationMs), stats: result.stats);
+        result.analyzerErrors,
+        warnings: result.analyzerWarnings,
+        duration: Duration(milliseconds: result.analyzerDurationMs),
+        stats: result.stats);
 
     // Cache successful compilation
     if (_isCacheEnabled && result.analyzerErrors.isEmpty) {
       try {
-        await cacheCompilationResult(
-            _sourceCode,
-            _tokens,
-            _ast,
-            result.analyzerErrors,
-            result.analyzerWarnings,
-            result.stats
-        );
+        await cacheCompilationResult(_sourceCode, _tokens, _ast,
+            result.analyzerErrors, result.analyzerWarnings, result.stats);
         _updateCacheStats();
       } catch (e) {
         debugPrint('Cache save failed: $e');
@@ -592,9 +653,9 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
       final optimizationSummary = result.optimizationStats.isNotEmpty
           ? '${result.optimizationStats['passes']} passes completed: '
-          '${result.optimizationStats['constantsFolded']} constants folded, '
-          '${result.optimizationStats['deadCodeRemoved']} dead code removed, '
-          '${result.optimizationStats['expressionsSimplified']} expressions simplified'
+              '${result.optimizationStats['constantsFolded']} constants folded, '
+              '${result.optimizationStats['deadCodeRemoved']} dead code removed, '
+              '${result.optimizationStats['expressionsSimplified']} expressions simplified'
           : 'No optimizations applied';
 
       _addPhase('Optimization', true, optimizationSummary, [],
@@ -615,8 +676,12 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     _executionTime = result.executionTime;
     _executionLog = result.executionLogJson;
 
-    _addPhase('Interpreting', result.interpreterErrors.isEmpty,
-        _output.isEmpty ? 'No output generated' : 'Output: ${_output.split('\n').length} lines',
+    _addPhase(
+        'Interpreting',
+        result.interpreterErrors.isEmpty,
+        _output.isEmpty
+            ? 'No output generated'
+            : 'Output: ${_output.split('\n').length} lines',
         result.interpreterErrors,
         duration: Duration(milliseconds: result.interpreterDurationMs),
         stats: {
@@ -649,7 +714,8 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
     notifyListeners();
   }
 
-  Future<void> _loadFromCache(CachedCompilationResult cachedResult, Stopwatch stopwatch) async {
+  Future<void> _loadFromCache(
+      CachedCompilationResult cachedResult, Stopwatch stopwatch) async {
     final cacheLoadStart = DateTime.now();
 
     _tokens = List<Token>.from(cachedResult.tokens);
@@ -688,14 +754,17 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
           duration: Duration.zero, wasCached: true);
     } else {
       _addPhase('Semantic Analysis', false, 'Semantic errors found',
-          cachedResult.errors, duration: Duration.zero, wasCached: true);
+          cachedResult.errors,
+          duration: Duration.zero, wasCached: true);
     }
 
     _state = CompilerState.optimizing;
     notifyListeners();
     await Future.delayed(Duration(milliseconds: 30));
 
-    if (_isOptimizationEnabled && cachedResult.ast != null && cachedResult.errors.isEmpty) {
+    if (_isOptimizationEnabled &&
+        cachedResult.ast != null &&
+        cachedResult.errors.isEmpty) {
       final optimizerStart = DateTime.now();
       final optimizer = Optimizer(config: _optimizerConfig);
       final optimizationResult = optimizer.optimize(cachedResult.ast!);
@@ -705,12 +774,13 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
       final optimizationSummary = optimizationResult.statistics.isNotEmpty
           ? '${optimizationResult.statistics['passes']} passes: '
-          '${optimizationResult.statistics['constantsFolded']} constants folded, '
-          '${optimizationResult.statistics['deadCodeRemoved']} dead code removed'
+              '${optimizationResult.statistics['constantsFolded']} constants folded, '
+              '${optimizationResult.statistics['deadCodeRemoved']} dead code removed'
           : 'No optimizations applied';
 
       _addPhase('Optimization', true, optimizationSummary, [],
-          warnings: optimizationResult.warnings.map((w) => w.toString()).toList(),
+          warnings:
+              optimizationResult.warnings.map((w) => w.toString()).toList(),
           duration: optimizerDuration,
           stats: optimizationResult.statistics);
     } else {
@@ -759,8 +829,12 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
         ? interpreter.errors.map((e) => e.toString()).toList()
         : <String>[];
 
-    _addPhase('Interpreting', interpreter.errors.isEmpty,
-        _output.isEmpty ? 'No output generated' : 'Output: ${_output.split('\n').length} lines',
+    _addPhase(
+        'Interpreting',
+        interpreter.errors.isEmpty,
+        _output.isEmpty
+            ? 'No output generated'
+            : 'Output: ${_output.split('\n').length} lines',
         interpreterErrors,
         duration: interpreterDuration,
         stats: {
@@ -793,15 +867,15 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   }
 
   void _addPhase(
-      String name,
-      bool success,
-      String result,
-      List<String> errors, {
-        List<String> warnings = const [],
-        Map<String, dynamic>? stats,
-        bool wasCached = false,
-        Duration? duration,
-      }) {
+    String name,
+    bool success,
+    String result,
+    List<String> errors, {
+    List<String> warnings = const [],
+    Map<String, dynamic>? stats,
+    bool wasCached = false,
+    Duration? duration,
+  }) {
     final phase = CompilationPhase(
       name: name,
       isSuccessful: success,
@@ -819,13 +893,13 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   void _clearResults() {
     _phases.clear();
     _output = '';
-    _tokens.clear();
+    _tokens = [];
     _ast = null;
     _optimizedAst = null;
     _symbolTable = null;
-    _executionLog.clear();
-    _compilationStats.clear();
-    _suggestions.clear();
+    _executionLog = [];
+    _compilationStats = {};
+    _suggestions = [];
     _executionTime = 0;
     _state = CompilerState.idle;
     notifyListeners();
@@ -876,7 +950,9 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
   }
 
   void clear() {
+    _isRunning = false;
     _clearResults();
+    notifyListeners();
   }
 
   String getPhaseStatusIcon(CompilationPhase phase) {
@@ -903,10 +979,11 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
   bool get isCompiling =>
       _state != CompilerState.idle &&
-          _state != CompilerState.completed &&
-          _state != CompilerState.error;
+      _state != CompilerState.completed &&
+      _state != CompilerState.error;
 
   bool get hasOutput => _output.isNotEmpty;
+
   bool get hasErrors => _phases.any((phase) => !(phase.isSuccessful ?? true));
 
   List<String> get allErrors => _phases
@@ -914,33 +991,47 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
       .expand((phase) => phase.errors)
       .toList();
 
-  List<String> get allWarnings => _phases
-      .expand((phase) => phase.warnings)
-      .toList();
+  List<String> get allWarnings =>
+      _phases.expand((phase) => phase.warnings).toList();
 
   String get currentPhase {
     switch (_state) {
-      case CompilerState.idle: return 'Ready';
-      case CompilerState.lexing: return 'Tokenizing...';
-      case CompilerState.parsing: return 'Parsing...';
-      case CompilerState.analyzing: return 'Analyzing...';
-      case CompilerState.optimizing: return 'Optimizing...';
-      case CompilerState.interpreting: return 'Interpreting...';
-      case CompilerState.completed: return 'Completed';
-      case CompilerState.error: return 'Error';
+      case CompilerState.idle:
+        return 'Ready';
+      case CompilerState.lexing:
+        return 'Tokenizing...';
+      case CompilerState.parsing:
+        return 'Parsing...';
+      case CompilerState.analyzing:
+        return 'Analyzing...';
+      case CompilerState.optimizing:
+        return 'Optimizing...';
+      case CompilerState.interpreting:
+        return 'Interpreting...';
+      case CompilerState.completed:
+        return 'Completed';
+      case CompilerState.error:
+        return 'Error';
     }
   }
 
   double get progressValue {
     switch (_state) {
-      case CompilerState.idle: return 0.0;
-      case CompilerState.lexing: return 0.2;
-      case CompilerState.parsing: return 0.35;
-      case CompilerState.analyzing: return 0.5;
-      case CompilerState.optimizing: return 0.65;
-      case CompilerState.interpreting: return 0.8;
+      case CompilerState.idle:
+        return 0.0;
+      case CompilerState.lexing:
+        return 0.2;
+      case CompilerState.parsing:
+        return 0.35;
+      case CompilerState.analyzing:
+        return 0.5;
+      case CompilerState.optimizing:
+        return 0.65;
+      case CompilerState.interpreting:
+        return 0.8;
       case CompilerState.completed:
-      case CompilerState.error: return 1.0;
+      case CompilerState.error:
+        return 1.0;
     }
   }
 
@@ -1019,6 +1110,7 @@ class CompilerProvider extends ChangeNotifier with CacheableMixin {
 
 class TimeoutException implements Exception {
   final String message;
+
   TimeoutException(this.message);
 
   @override

@@ -9,7 +9,7 @@ import 'code_intelligence.dart';
 import 'code_folding.dart';
 
 class ModernEditorTheme {
-  static const double lineNumberWidth = 42.0;
+  static const double lineNumberWidth = 50.0;
   static const double foldingGutterWidth = 24.0;
   static const double padding = 10.0;
   static const double borderRadius = 16.0;
@@ -33,6 +33,14 @@ class AdvancedScrollBehavior extends ScrollBehavior {
 
   @override
   Widget buildOverscrollIndicator(context, child, details) => child;
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.trackpad,
+  };
 }
 
 class CodeEditorContainer extends StatefulWidget {
@@ -615,7 +623,6 @@ class EditorBody extends StatelessWidget {
                   scrollController: textScrollController,
                   currentLine: currentLine,
                 ),
-                // ============ NEW: TextField با Hover و Long Press ============
                 ModernTextFieldWithHover(
                   controller: controller,
                   focusNode: focusNode,
@@ -627,6 +634,128 @@ class EditorBody extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ModernLineNumbers extends StatelessWidget {
+  final int lineCount;
+  final ScrollController scrollController;
+  final int currentLine;
+  final List<CodeError> diagnostics;
+  final AdvancedCodeFoldingManager foldingManager;
+
+  const ModernLineNumbers({
+    super.key,
+    required this.lineCount,
+    required this.scrollController,
+    required this.currentLine,
+    required this.diagnostics,
+    required this.foldingManager,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // گروه‌بندی diagnostics
+    final diags = <int, List<CodeError>>{};
+    for (final d in diagnostics) {
+      diags.putIfAbsent(d.line, () => []).add(d);
+    }
+
+    return Container(
+      width: ModernEditorTheme.lineNumberWidth,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            theme.colorScheme.surface.withOpacity(0.5),
+          ],
+        ),
+      ),
+      child: ScrollConfiguration(
+        behavior: AdvancedScrollBehavior(),
+        child: SingleChildScrollView(
+          controller: scrollController,
+          physics: NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.only(top: 16, left: 4, right: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: List.generate(lineCount, (index) {
+              final lineNumber = index + 1;
+
+              if (foldingManager.isLineHidden(lineNumber)) {
+                return SizedBox.shrink();
+              }
+
+              final isCurrent = lineNumber == currentLine;
+              final lineDiags = diags[lineNumber] ?? [];
+              final hasError = lineDiags.any((d) => d.severity == ErrorSeverity.error);
+              final hasWarn = lineDiags.any((d) => d.severity == ErrorSeverity.warning);
+
+              return Container(
+                height: ModernEditorTheme.calculatedLineHeight,
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 10,
+                      child: (hasError || hasWarn)
+                          ? Icon(
+                        hasError ? Icons.error : Icons.warning,
+                        size: 10,
+                        color: hasError
+                            ? Colors.red.shade400
+                            : Colors.orange.shade400,
+                      )
+                          : null,
+                    ),
+                    SizedBox(width: 2),
+                    Expanded(
+                      child: Container(
+                        alignment: Alignment.centerRight,
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          gradient: isCurrent
+                              ? LinearGradient(
+                            colors: [
+                              ModernEditorTheme.primaryGradient[0].withOpacity(0.25),
+                              ModernEditorTheme.primaryGradient[1].withOpacity(0.2),
+                            ],
+                          )
+                              : null,
+                          borderRadius: BorderRadius.circular(4),
+                          border: isCurrent
+                              ? Border.all(
+                            color: ModernEditorTheme.primaryGradient[0].withOpacity(0.5),
+                            width: 1.5,
+                          )
+                              : null,
+                        ),
+                        child: Text(
+                          '$lineNumber',
+                          style: TextStyle(
+                            fontFamily: 'Courier New',
+                            fontSize: 11.5,
+                            height: 1.0,
+                            color: isCurrent
+                                ? ModernEditorTheme.primaryGradient[0]
+                                : theme.colorScheme.onSurface.withOpacity(0.55),
+                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
@@ -683,7 +812,6 @@ class _ModernTextFieldWithHoverState extends State<ModernTextFieldWithHover> {
         _longPressTimer?.cancel();
       },
       onPointerMove: (event) {
-        // Cancel long press if finger moves
         if (_lastTapPosition != null) {
           final distance = (event.position - _lastTapPosition!).distance;
           if (distance > 10) {
@@ -876,7 +1004,7 @@ class _ModernTextFieldWithHoverState extends State<ModernTextFieldWithHover> {
 
       final lineHeight = ModernEditorTheme.calculatedLineHeight;
       final line = (localPosition.dy / lineHeight).floor();
-      final charWidth = ModernEditorTheme.fontSize * 0.6; // تقریبی
+      final charWidth = ModernEditorTheme.fontSize * 0.6;
       final column = (localPosition.dx / charWidth).floor();
 
       final lines = widget.controller.text.split('\n');
@@ -884,7 +1012,7 @@ class _ModernTextFieldWithHoverState extends State<ModernTextFieldWithHover> {
 
       int offset = 0;
       for (int i = 0; i < line; i++) {
-        offset += lines[i].length + 1; // +1 برای \n
+        offset += lines[i].length + 1;
       }
       offset += column.clamp(0, lines[line].length);
 
@@ -982,121 +1110,6 @@ class SmartIndentFormatter extends TextInputFormatter {
     }
 
     return val;
-  }
-}
-
-class ModernLineNumbers extends StatelessWidget {
-  final int lineCount;
-  final ScrollController scrollController;
-  final int currentLine;
-  final List<CodeError> diagnostics;
-  final AdvancedCodeFoldingManager foldingManager;
-
-  const ModernLineNumbers({
-    super.key,
-    required this.lineCount,
-    required this.scrollController,
-    required this.currentLine,
-    required this.diagnostics,
-    required this.foldingManager,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final diags = <int, List<CodeError>>{};
-    for (final d in diagnostics) {
-      diags.putIfAbsent(d.line, () => []).add(d);
-    }
-
-    return Container(
-      width: ModernEditorTheme.lineNumberWidth,
-      padding: EdgeInsets.only(top: 16, left: 4, right: 4),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            theme.colorScheme.surfaceVariant.withOpacity(0.3),
-            theme.colorScheme.surface.withOpacity(0.5),
-          ],
-        ),
-      ),
-      child: ScrollConfiguration(
-        behavior: AdvancedScrollBehavior(),
-        child: ListView.builder(
-          controller: scrollController,
-          physics: NeverScrollableScrollPhysics(),
-          itemCount: lineCount,
-          itemBuilder: (context, index) {
-            final num = index + 1;
-            if (foldingManager.isLineHidden(num)) return SizedBox.shrink();
-
-            final isCurrent = num == currentLine;
-            final lineDiags = diags[num] ?? [];
-            final hasError = lineDiags.any((d) => d.severity == ErrorSeverity.error);
-            final hasWarn = lineDiags.any((d) => d.severity == ErrorSeverity.warning);
-
-            return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              child: SizedBox(
-                height: ModernEditorTheme.calculatedLineHeight,
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 10,
-                      child: (hasError || hasWarn)
-                          ? Icon(
-                        hasError ? Icons.error : Icons.warning,
-                        size: 10,
-                        color: hasError ? Colors.red.shade400 : Colors.orange.shade400,
-                      )
-                          : null,
-                    ),
-                    SizedBox(width: 4),
-                    Expanded(
-                      child: Container(
-                        alignment: Alignment.centerRight,
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          gradient: isCurrent
-                              ? LinearGradient(
-                            colors: [
-                              ModernEditorTheme.primaryGradient[0].withOpacity(0.2),
-                              ModernEditorTheme.primaryGradient[1].withOpacity(0.15),
-                            ],
-                          )
-                              : null,
-                          borderRadius: BorderRadius.circular(6),
-                          border: isCurrent
-                              ? Border.all(
-                            color: ModernEditorTheme.primaryGradient[0].withOpacity(0.4),
-                            width: 1,
-                          )
-                              : null,
-                        ),
-                        child: Text(
-                          '$num',
-                          style: TextStyle(
-                            fontFamily: 'Courier New',
-                            fontSize: 12,
-                            height: ModernEditorTheme.lineHeight,
-                            color: isCurrent
-                                ? ModernEditorTheme.primaryGradient[0]
-                                : theme.colorScheme.onSurface.withOpacity(0.4),
-                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
   }
 }
 

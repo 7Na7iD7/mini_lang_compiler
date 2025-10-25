@@ -1,7 +1,10 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/compiler_provider.dart';
+import 'compiler_performance_analyzer_ui.dart';
 import 'comprehensive_compiler_viewer.dart';
+import 'compiler_performance_analyzer.dart';
 
 class PhaseColors {
   static const success = Color(0xFF10B981);
@@ -27,6 +30,16 @@ class _CompilationPhasesState extends State<CompilationPhases>
   final Map<int, bool> _expandedPhases = {};
   final ScrollController _scrollController = ScrollController();
   bool _expandAll = false;
+
+  // Performance Analyzer
+  final CompilerPerformanceAnalyzer _performanceAnalyzer = CompilerPerformanceAnalyzer();
+  int _totalMetricsRecorded = 0;
+
+  bool _lastWasCompiling = false;
+  int _lastPhaseCount = 0;
+  String _lastCompilationHash = '';
+
+  bool _isRecordingMetrics = false;
 
   @override
   void initState() {
@@ -96,11 +109,119 @@ class _CompilationPhasesState extends State<CompilationPhases>
     );
   }
 
+  String _generateCompilationHash(CompilerProvider provider) {
+    if (provider.phases.isEmpty) return '';
+
+    // Create hash from phase data only
+    final phaseData = provider.phases.map((p) =>
+    '${p.name}:${p.duration.inMicroseconds}:${p.isSuccessful}'
+    ).join('|');
+
+    return '${provider.sourceCode.hashCode}-${phaseData.hashCode}';
+  }
+
+  bool _shouldRecordMetrics(CompilerProvider provider) {
+
+    if (provider.isCompiling) return false;
+
+    if (provider.phases.isEmpty) return false;
+
+    if (_isRecordingMetrics) return false;
+
+    final currentHash = _generateCompilationHash(provider);
+
+    if (currentHash == _lastCompilationHash) return false;
+
+    return true;
+  }
+
+  void _recordPerformanceMetrics(CompilerProvider provider) {
+    if (!_shouldRecordMetrics(provider)) {
+      return;
+    }
+
+    _isRecordingMetrics = true;
+
+    try {
+      _lastCompilationHash = _generateCompilationHash(provider);
+
+      final totalDuration = provider.phases.fold<Duration>(
+        Duration.zero,
+            (sum, phase) => sum + phase.duration,
+      );
+
+      final phaseMetrics = provider.phases.map((phase) {
+        return PhaseMetric(
+          name: phase.name,
+          duration: phase.duration,
+          successful: phase.isSuccessful ?? false,
+        );
+      }).toList();
+
+      final hasCachedPhase = provider.phases.any((p) => p.wasCached ?? false);
+      final codeSize = provider.sourceCode.length;
+
+      _performanceAnalyzer.recordMetric(
+        PerformanceMetric(
+          totalDuration: totalDuration,
+          phases: phaseMetrics,
+          cacheHit: hasCachedPhase,
+          codeSize: codeSize,
+        ),
+      );
+
+      setState(() {
+        _totalMetricsRecorded++;
+      });
+
+      debugPrint('✅ Recorded compilation #$_totalMetricsRecorded');
+      debugPrint('   Duration: ${totalDuration.inMilliseconds}ms');
+      debugPrint('   Hash: ${_lastCompilationHash.substring(0, math.min(20, _lastCompilationHash.length))}...');
+    } catch (e) {
+      debugPrint('❌ Error recording performance metrics: $e');
+    } finally {
+      // Reset flag after a short delay to allow next compilation
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          _isRecordingMetrics = false;
+        }
+      });
+    }
+  }
+
+  void _showPerformanceAnalysis(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PerformanceAnalyzerWidget(
+          analyzer: _performanceAnalyzer,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<CompilerProvider>(
       builder: (context, provider, _) {
         _updateProgressAnimation(provider);
+
+        final isCompiling = provider.isCompiling;
+        final phaseCount = provider.phases.length;
+
+        final compilationJustFinished = _lastWasCompiling && !isCompiling;
+        final phasesChanged = phaseCount != _lastPhaseCount && phaseCount > 0;
+
+        if ((compilationJustFinished || phasesChanged) && !isCompiling) {
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _recordPerformanceMetrics(provider);
+            }
+          });
+        }
+
+        _lastWasCompiling = isCompiling;
+        _lastPhaseCount = phaseCount;
 
         return Card(
           elevation: 0,
@@ -123,6 +244,10 @@ class _CompilationPhasesState extends State<CompilationPhases>
                 onShowDetailsAll: provider.phases.isNotEmpty
                     ? () => _showPhaseDetails(context, provider)
                     : null,
+                onShowPerformanceAnalysis: _totalMetricsRecorded > 0
+                    ? () => _showPerformanceAnalysis(context)
+                    : null,
+                totalMetrics: _totalMetricsRecorded,
               ),
               if (provider.isCompiling)
                 _ProgressBar(controller: _progressController),
@@ -141,7 +266,10 @@ class _CompilationPhasesState extends State<CompilationPhases>
                 ),
               ),
               if (provider.phases.isNotEmpty)
-                _PhasesFooter(provider: provider),
+                _PhasesFooter(
+                  provider: provider,
+                  totalMetricsRecorded: _totalMetricsRecorded,
+                ),
             ],
           ),
         );
@@ -168,6 +296,8 @@ class _PhasesHeader extends StatelessWidget {
   final bool expandAll;
   final VoidCallback onToggleExpandAll;
   final VoidCallback? onShowDetailsAll;
+  final VoidCallback? onShowPerformanceAnalysis;
+  final int totalMetrics;
 
   const _PhasesHeader({
     required this.isRunning,
@@ -176,6 +306,8 @@ class _PhasesHeader extends StatelessWidget {
     required this.expandAll,
     required this.onToggleExpandAll,
     this.onShowDetailsAll,
+    this.onShowPerformanceAnalysis,
+    this.totalMetrics = 0,
   });
 
   @override
@@ -244,7 +376,9 @@ class _PhasesHeader extends StatelessWidget {
                     if (!isSmallScreen) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Build process visualization',
+                        totalMetrics > 0
+                            ? '$totalMetrics compilation${totalMetrics > 1 ? "s" : ""} analyzed'
+                            : 'Build process visualization',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withOpacity(0.6),
                           fontSize: 11,
@@ -327,6 +461,27 @@ class _PhasesHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onShowPerformanceAnalysis != null) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onShowPerformanceAnalysis,
+                      icon: const Icon(Icons.analytics_rounded, size: 16),
+                      label: Text(
+                        'Analysis',
+                        style: TextStyle(fontSize: isSmallScreen ? 11 : 12),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.secondary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
                 _ExpandAllButton(
                   expanded: expandAll,
@@ -1116,8 +1271,12 @@ class _PhaseStatusIcon extends StatelessWidget {
 
 class _PhasesFooter extends StatelessWidget {
   final CompilerProvider provider;
+  final int totalMetricsRecorded;
 
-  const _PhasesFooter({required this.provider});
+  const _PhasesFooter({
+    required this.provider,
+    required this.totalMetricsRecorded,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1149,40 +1308,78 @@ class _PhasesFooter extends StatelessWidget {
           bottomRight: Radius.circular(16),
         ),
       ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _StatBadge(
-            icon: Icons.timer_rounded,
-            label: 'Total',
-            value: '${totalDuration}ms',
-            color: theme.colorScheme.primary,
-            isSmall: isSmallScreen,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatBadge(
+                icon: Icons.timer_rounded,
+                label: 'Total',
+                value: '${totalDuration}ms',
+                color: theme.colorScheme.primary,
+                isSmall: isSmallScreen,
+              ),
+              _StatBadge(
+                icon: Icons.check_circle_rounded,
+                label: 'Success',
+                value: '$successCount',
+                color: PhaseColors.success,
+                isSmall: isSmallScreen,
+              ),
+              if (errorCount > 0)
+                _StatBadge(
+                  icon: Icons.error_rounded,
+                  label: 'Errors',
+                  value: '$errorCount',
+                  color: PhaseColors.error,
+                  isSmall: isSmallScreen,
+                ),
+              if (cachedCount > 0)
+                _StatBadge(
+                  icon: Icons.flash_on,
+                  label: 'Cached',
+                  value: '$cachedCount',
+                  color: PhaseColors.cached,
+                  isSmall: isSmallScreen,
+                ),
+            ],
           ),
-          _StatBadge(
-            icon: Icons.check_circle_rounded,
-            label: 'Success',
-            value: '$successCount',
-            color: PhaseColors.success,
-            isSmall: isSmallScreen,
-          ),
-          if (errorCount > 0)
-            _StatBadge(
-              icon: Icons.error_rounded,
-              label: 'Errors',
-              value: '$errorCount',
-              color: PhaseColors.error,
-              isSmall: isSmallScreen,
+          if (totalMetricsRecorded > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.2),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.analytics_rounded,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$totalMetricsRecorded compilation${totalMetricsRecorded > 1 ? "s" : ""} recorded for analysis',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.8),
+                        fontSize: isSmallScreen ? 10 : 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          if (cachedCount > 0)
-            _StatBadge(
-              icon: Icons.flash_on,
-              label: 'Cached',
-              value: '$cachedCount',
-              color: PhaseColors.cached,
-              isSmall: isSmallScreen,
-            ),
+          ],
         ],
       ),
     );

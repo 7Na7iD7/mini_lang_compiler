@@ -128,7 +128,6 @@ class ShinePainter extends CustomPainter {
   }
 }
 
-// Custom clipper for hexagonal compiler shape
 class CompilerShapeClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
@@ -357,6 +356,12 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
     HapticFeedback.selectionClick();
     setState(() => _selectedIndex = index);
+
+    if (index == 0) {
+      _fabController.forward();
+    } else {
+      _fabController.reverse();
+    }
 
     _pageController.animateToPage(
       index,

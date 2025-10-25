@@ -39,7 +39,6 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
   }
 
   void _initializeAnimations() {
-
     _pageAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -105,7 +104,6 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
               );
             },
           ),
-
           floatingActionButton: _buildFloatingActionMenu(provider),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         );
@@ -165,13 +163,11 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
       actions: [
         const AnimatedStatusIndicator(),
         const SizedBox(width: 16),
-
         AnimatedRunButton(
           isRunning: provider.isRunning,
           onPressed: () => _handleCompileAction(provider),
         ),
         const SizedBox(width: 16),
-
         _buildAdvancedOptionsMenu(provider),
         const SizedBox(width: 8),
       ],
@@ -281,7 +277,7 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
               flex: 6,
               child: Column(
                 children: [
-                  _buildAnimatedExampleSelector(),
+                  _buildCompactExampleSelector(provider),
                   const SizedBox(height: 16),
                   Expanded(
                     child: AnimatedInfoCard(
@@ -295,7 +291,6 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
               ),
             ),
             const SizedBox(width: 20),
-
             Expanded(
               flex: 5,
               child: Column(
@@ -310,7 +305,6 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   Expanded(
                     flex: 2,
                     child: AnimatedInfoCard(
@@ -345,7 +339,7 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildAnimatedExampleSelector(),
+            _buildCompactExampleSelector(provider),
             const SizedBox(height: 16),
             Expanded(
               child: Row(
@@ -434,7 +428,7 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     children: [
-                      _buildAnimatedExampleSelector(),
+                      _buildCompactExampleSelector(provider),
                       const SizedBox(height: 12),
                       Expanded(
                         child: AnimatedInfoCard(
@@ -477,33 +471,128 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
     );
   }
 
-
-  Widget _buildAnimatedExampleSelector() {
-    return Hero(
-      tag: 'example_selector',
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.orange.shade400,
-                Colors.orange.shade600,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.orange.withOpacity(0.3),
-                spreadRadius: 1,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+  Widget _buildCompactExampleSelector(CompilerProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.library_books_rounded, size: 18, color: Colors.blue.shade700),
+              const SizedBox(width: 8),
+              Text(
+                'نمونه کدها',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
               ),
             ],
           ),
-          child: const ExampleCodeSelector(),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildCompactButton(
+                icon: Icons.waving_hand_rounded,
+                label: 'سلام',
+                color: Colors.blue,
+                onTap: () => _loadExample('hello', provider),
+              ),
+              _buildCompactButton(
+                icon: Icons.calculate_rounded,
+                label: 'حسابی',
+                color: Colors.green,
+                onTap: () => _loadExample('arithmetic', provider),
+              ),
+              _buildCompactButton(
+                icon: Icons.alt_route_rounded,
+                label: 'شرطی',
+                color: Colors.orange,
+                onTap: () => _loadExample('conditional', provider),
+              ),
+              _buildCompactButton(
+                icon: Icons.loop_rounded,
+                label: 'حلقه',
+                color: Colors.purple,
+                onTap: () => _loadExample('loop', provider),
+              ),
+              _buildCompactButton(
+                icon: Icons.functions_rounded,
+                label: 'پیچیده',
+                color: Colors.red,
+                onTap: () => _loadExample('complex', provider),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactButton({
+    required IconData icon,
+    required String label,
+    required MaterialColor color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color.shade700),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color.shade700,
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  void _loadExample(String exampleKey, CompilerProvider provider) {
+    provider.loadExampleCode(exampleKey);
+    final exampleNames = {
+      'hello': 'سلام دنیا',
+      'arithmetic': 'عملیات حسابی',
+      'conditional': 'دستور شرطی',
+      'loop': 'حلقه',
+      'complex': 'فاکتوریل',
+    };
+    _showEnhancedSnackBar(
+      'نمونه "${exampleNames[exampleKey]}" بارگذاری شد',
+      Colors.blue.shade600,
+      Icons.check_circle_rounded,
     );
   }
 
@@ -680,7 +769,6 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
     }
 
     HapticFeedback.mediumImpact();
-
     provider.compile();
 
     _showEnhancedSnackBar(
@@ -713,7 +801,6 @@ class _EnhancedCompilerScreenState extends State<EnhancedCompilerScreen>
     }
   }
 
-  /// SnackBar
   void _showEnhancedSnackBar(String message, Color color, IconData icon) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

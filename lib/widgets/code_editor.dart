@@ -27,7 +27,7 @@ class _CodeEditorState extends State<CodeEditor>
 
   late final AnimationController _statusAnimController;
 
-  // Overlay portal controllers for floating UI
+  // Overlay portal controllers
   late final OverlayPortalController _autoCompletePortal;
   late final OverlayPortalController _signatureHelpPortal;
 
@@ -38,6 +38,7 @@ class _CodeEditorState extends State<CodeEditor>
   // UI state
   bool _isHovering = false;
   bool _isInitialized = false;
+  bool _isSyncing = false;
 
   // Editor metrics
   int _lineCount = 1;
@@ -79,7 +80,6 @@ class _CodeEditorState extends State<CodeEditor>
   void _setupEventListeners() {
     _textController.addListener(_onTextControllerChanged);
     _focusNode.addListener(_onFocusChanged);
-
     _textScrollController.addListener(_syncScrollPositions);
   }
 
@@ -88,15 +88,18 @@ class _CodeEditorState extends State<CodeEditor>
 
     final offset = _textScrollController.offset;
 
-    if (_lineNumberScrollController.hasClients &&
-        _lineNumberScrollController.offset != offset) {
-      _lineNumberScrollController.jumpTo(offset);
+    if (_lineNumberScrollController.hasClients) {
+      final diff = (_lineNumberScrollController.offset - offset).abs();
+      if (diff > 0.5) {
+        _lineNumberScrollController.jumpTo(offset);
+      }
     }
 
-    // folding gutter
-    if (_foldingScrollController.hasClients &&
-        _foldingScrollController.offset != offset) {
-      _foldingScrollController.jumpTo(offset);
+    if (_foldingScrollController.hasClients) {
+      final diff = (_foldingScrollController.offset - offset).abs();
+      if (diff > 0.5) {
+        _foldingScrollController.jumpTo(offset);
+      }
     }
   }
 
@@ -115,6 +118,8 @@ class _CodeEditorState extends State<CodeEditor>
   }
 
   void _onTextControllerChanged() {
+    if (_isSyncing) return;
+
     _updateEditorMetrics();
     _updateCodeIntelligence();
   }
@@ -123,22 +128,26 @@ class _CodeEditorState extends State<CodeEditor>
     final text = _textController.text;
     final selection = _textController.selection;
 
-    // Calculate new metrics
-    final newLineCount = text.split('\n').length;
+    final lines = text.split('\n');
+    final newLineCount = lines.length;
+
     final cursorPos = selection.baseOffset.clamp(0, text.length);
     final textBeforeCursor = text.substring(0, cursorPos);
-    final lines = textBeforeCursor.split('\n');
-    final newLine = lines.length;
-    final newColumn = lines.last.length;
+    final linesBeforeCursor = textBeforeCursor.split('\n');
+    final newCurrentLine = linesBeforeCursor.length;
+    final newCurrentColumn = linesBeforeCursor.isEmpty ? 0 : linesBeforeCursor.last.length;
 
-    // Batch update if anything changed
     if (newLineCount != _lineCount ||
-        newLine != _currentLine ||
-        newColumn != _currentColumn) {
-      setState(() {
-        _lineCount = newLineCount;
-        _currentLine = newLine;
-        _currentColumn = newColumn;
+        newCurrentLine != _currentLine ||
+        newCurrentColumn != _currentColumn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _lineCount = newLineCount;
+            _currentLine = newCurrentLine;
+            _currentColumn = newCurrentColumn;
+          });
+        }
       });
     }
   }
@@ -151,7 +160,11 @@ class _CodeEditorState extends State<CodeEditor>
   void _updateDiagnostics() {
     final newDiagnostics = _textController.getDiagnostics();
     if (!_areDiagnosticsEqual(newDiagnostics, _diagnostics)) {
-      setState(() => _diagnostics = newDiagnostics);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _diagnostics = newDiagnostics);
+        }
+      });
     }
   }
 
@@ -169,7 +182,9 @@ class _CodeEditorState extends State<CodeEditor>
 
   void _updateFoldingRegions() {
     _foldingManager.analyzeFoldingRegions(_textController.text);
-    if (mounted) setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onFocusChanged() {
@@ -178,24 +193,25 @@ class _CodeEditorState extends State<CodeEditor>
     }
   }
 
-  /// Hide all floating overlays
   void _hideAllOverlays() {
     _autoCompletePortal.hide();
     _signatureHelpPortal.hide();
   }
 
-  // Text Synchronization
   void _syncTextWithProvider(String newText) {
     if (_textController.text == newText) return;
+
+    _isSyncing = true; // شروع sync
 
     final cursorPos = _textController.selection.baseOffset;
     _textController.text = newText;
 
-    // Restore cursor position intelligently
     final newPos = cursorPos.clamp(0, newText.length);
     _textController.selection = TextSelection.collapsed(offset: newPos);
 
     _foldingManager.analyzeFoldingRegions(newText);
+
+    _isSyncing = false; // پایان sync
   }
 
   void _handleUserTextChange(String text) {
@@ -203,7 +219,6 @@ class _CodeEditorState extends State<CodeEditor>
     _triggerSignatureHelp();
   }
 
-  // Auto-Completion System
   void _triggerAutoComplete() {
     final cursorPos = _textController.selection.baseOffset;
     if (cursorPos <= 0) {
@@ -246,18 +261,15 @@ class _CodeEditorState extends State<CodeEditor>
     final startPos = match.start;
     final insertText = item.displayText;
 
-    // Build new text with completion
     final newText = _textController.text.substring(0, startPos) +
         insertText +
         _textController.text.substring(cursorPos);
 
     _textController.text = newText;
 
-    // Smart cursor positioning
     int newCursorPos = startPos + insertText.length;
     if (insertText.endsWith('()')) {
-      newCursorPos -= 1; // Place cursor inside parentheses
-
+      newCursorPos -= 1;
       Future.delayed(const Duration(milliseconds: 100), _triggerSignatureHelp);
     }
 
@@ -267,7 +279,6 @@ class _CodeEditorState extends State<CodeEditor>
     HapticFeedback.selectionClick();
   }
 
-  // Signature Help System
   void _triggerSignatureHelp() {
     final cursorPos = _textController.selection.baseOffset;
     final signatureHelp = _textController.getSignatureHelp(cursorPos);
@@ -280,17 +291,13 @@ class _CodeEditorState extends State<CodeEditor>
     }
   }
 
-  // Keyboard Shortcuts
-
   bool _handleKeyboardEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
 
-    // Handle auto-complete overlay navigation
     if (_autoCompletePortal.isShowing) {
       return _handleAutoCompleteKeys(event);
     }
 
-    // Handle global editor shortcuts
     return _handleEditorShortcuts(event);
   }
 
@@ -335,25 +342,21 @@ class _CodeEditorState extends State<CodeEditor>
     final key = event.logicalKey;
     final isShift = HardwareKeyboard.instance.isShiftPressed;
 
-    // Ctrl/Cmd + D: Duplicate line
     if (key == LogicalKeyboardKey.keyD && !isShift) {
       _duplicateCurrentLine();
       return true;
     }
 
-    // Ctrl/Cmd + /: Toggle comment
     if (key == LogicalKeyboardKey.slash) {
       _toggleLineComment();
       return true;
     }
 
-    // Ctrl/Cmd + Space: Force auto-complete
     if (key == LogicalKeyboardKey.space) {
       _triggerAutoComplete();
       return true;
     }
 
-    // Ctrl/Cmd + S: Format code (custom)
     if (key == LogicalKeyboardKey.keyS && isShift) {
       _formatCode();
       return true;
@@ -362,31 +365,28 @@ class _CodeEditorState extends State<CodeEditor>
     return false;
   }
 
-  // Editor Commands
   void _duplicateCurrentLine() {
     final text = _textController.text;
     final cursorPos = _textController.selection.baseOffset;
     final lines = text.split('\n');
 
-    // Find current line
     int pos = 0;
     int lineIndex = 0;
     for (int i = 0; i < lines.length; i++) {
-      if (pos + lines[i].length >= cursorPos) {
+      final lineLength = lines[i].length;
+      if (pos + lineLength >= cursorPos) {
         lineIndex = i;
         break;
       }
-      pos += lines[i].length + 1;
+      pos += lineLength + 1;
     }
 
-    // Duplicate line
     final currentLine = lines[lineIndex];
     lines.insert(lineIndex + 1, currentLine);
 
     final newText = lines.join('\n');
     _textController.text = newText;
 
-    // Move cursor to duplicated line
     final newCursorPos = pos + currentLine.length + 1;
     _textController.selection = TextSelection.collapsed(offset: newCursorPos);
 
@@ -409,7 +409,6 @@ class _CodeEditorState extends State<CodeEditor>
     int cursorOffset;
 
     if (trimmed.startsWith('//')) {
-      // Remove comment
       final withoutComment = trimmed.substring(2).trimLeft();
       newLine = spaces + withoutComment;
       cursorOffset = -(trimmed.length - withoutComment.length);
@@ -442,15 +441,12 @@ class _CodeEditorState extends State<CodeEditor>
         continue;
       }
 
-      // Decrease indent for closing brackets
       if (_startsWithClosing(trimmed)) {
         indentLevel = (indentLevel - 1).clamp(0, 50);
       }
 
-      // Add formatted line
       formatted.add('  ' * indentLevel + trimmed);
 
-      // Increase indent for opening brackets
       if (_endsWithOpening(trimmed)) {
         indentLevel++;
       }
@@ -476,13 +472,17 @@ class _CodeEditorState extends State<CodeEditor>
     _textController.clear();
     provider.clear();
     _foldingManager.clear();
-    setState(() => _diagnostics.clear());
+    setState(() {
+      _diagnostics.clear();
+      _lineCount = 1;
+      _currentLine = 1;
+      _currentColumn = 0;
+    });
     _hideAllOverlays();
 
     HapticFeedback.heavyImpact();
   }
 
-  // Animation Management
   void _updateStatusAnimation(CompilerState state) {
     if (state == CompilerState.idle || state == CompilerState.completed) {
       _statusAnimController.forward();
@@ -491,29 +491,27 @@ class _CodeEditorState extends State<CodeEditor>
     }
   }
 
-  // Lifecycle
   @override
   void dispose() {
     _textController.dispose();
     _focusNode.dispose();
-
     _textScrollController.dispose();
     _lineNumberScrollController.dispose();
     _foldingScrollController.dispose();
-
     _statusAnimController.dispose();
     super.dispose();
   }
 
-  // Build Method
   @override
   Widget build(BuildContext context) {
     return Consumer<CompilerProvider>(
       builder: (context, provider, _) {
-        // Sync text with provider
-        _syncTextWithProvider(provider.sourceCode);
-
-        _updateStatusAnimation(provider.state);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _syncTextWithProvider(provider.sourceCode);
+            _updateStatusAnimation(provider.state);
+          }
+        });
 
         return _buildEditorLayout(provider);
       },
@@ -584,7 +582,6 @@ class _CodeEditorState extends State<CodeEditor>
               textScrollController: _textScrollController,
               lineNumberScrollController: _lineNumberScrollController,
               foldingScrollController: _foldingScrollController,
-
               isRunning: provider.isRunning,
               lineCount: _lineCount,
               currentLine: _currentLine,
