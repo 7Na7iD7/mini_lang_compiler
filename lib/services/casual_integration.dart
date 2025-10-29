@@ -50,7 +50,7 @@ class UnifiedChatService {
   UnifiedChatService._internal();
 
   late final AdvancedAIChatService _technicalService;
-  late final CasualConversationHandler _casualHandler;
+  late final AdvancedCasualConversationHandler _casualHandler;
 
   bool _isInitialized = false;
 
@@ -62,7 +62,7 @@ class UnifiedChatService {
     print('╚════════════════════════════════════════════════════════════╝\n');
 
     _technicalService = AdvancedAIChatService();
-    _casualHandler = CasualConversationHandler();
+    _casualHandler = AdvancedCasualConversationHandler();
 
     _isInitialized = true;
 
@@ -87,14 +87,13 @@ class UnifiedChatService {
     print('║   ┌─────────────────┐    ┌────────────────────┐          ║');
     print('║   │ 💬 Casual       │    │ 🧠 Technical       │          ║');
     print('║   │ Handler         │    │ ML/NLP Engine      │          ║');
-    print('║   │                 │    │ (3-Layer System)   │          ║');
+    print('║   │                 │    │ (4-Layer System)   │          ║');
     print('║   └─────────────────┘    └────────────────────┘          ║');
     print('║                                                            ║');
     print('╚════════════════════════════════════════════════════════════╝\n');
   }
 
   Future<void> _ensureInitialized() async {
-
     if (!_isInitialized) {
       await initialize();
     }
@@ -115,33 +114,33 @@ class UnifiedChatService {
 
     print('🔍 مرحله 1: تشخیص نوع پیام...');
 
-    final casualResponse = await _casualHandler.handleCasualMessage(
+    // handleMessage
+    final casualResponse = await _casualHandler.handleMessage(
       message: message,
       conversationHistory: history?.map((m) => m.text).toList() ?? [],
     );
 
     if (casualResponse != null && casualResponse.isCasual) {
       print('   ✓ نوع: مکالمه غیرفنی (Casual)');
-      print('   • Intent: ${casualResponse.intent.type}');
-      print('   • Emotion: ${casualResponse.emotion}');
-      print('   • Confidence: ${(casualResponse.confidence * 100).toInt()}%\n');
+      print('   • Intent: ${casualResponse.intent.primaryIntent}');
+      print('   • Emotion: ${casualResponse.emotion.primaryEmotion}');
+      print('   • Confidence: ${(casualResponse.overallConfidence * 100).toInt()}%\n');
 
       final processingTime = DateTime.now().difference(startTime);
 
       return UnifiedChatResponse(
-        text: casualResponse.text,
+        text: casualResponse.responseText,
         type: ResponseType.casual,
-        confidence: casualResponse.confidence,
+        confidence: casualResponse.overallConfidence,
         processingTime: processingTime,
         metadata: {
-          'intent': casualResponse.intent.type.toString(),
-          'sentiment': casualResponse.sentiment.type.toString(),
-          'emotion': casualResponse.emotion.toString(),
-          'handler': 'CasualConversationHandler',
+          'intent': casualResponse.intent.primaryIntent.toString(),
+          'sentiment': casualResponse.sentiment.label.toString(),
+          'emotion': casualResponse.emotion.primaryEmotion.toString(),
+          'handler': 'AdvancedCasualConversationHandler',
         },
       );
     } else {
-
       print('   ✓ نوع: سوال فنی (Technical)\n');
       print('🧠 مرحله 2: پردازش با موتور ML/NLP پیشرفته...\n');
 
@@ -166,9 +165,11 @@ class UnifiedChatService {
   }
 
   Map<String, dynamic> getComprehensiveStats() {
+    final casualStats = _casualHandler.getPerformanceMetrics();
+
     return {
       'technical_stats': _technicalService.getProvidersStatus(),
-      'casual_stats': _casualHandler.getStatistics(),
+      'casual_stats': casualStats,
       'system_info': {
         'initialized': _isInitialized,
         'architecture': 'Dual-Engine (Casual + Technical)',
@@ -191,7 +192,7 @@ class UnifiedChatService {
 ║                                                            ║
 ╠════════════════════════════════════════════════════════════╣
 ║  💬 آمار Casual Handler:                                   ║
-║  ${stats['casual_stats']['total_casual_interactions'] ?? 0} تعامل غیرفنی                                      ║
+║  ${stats['casual_stats']['total_interactions'] ?? 0} تعامل غیرفنی                                      ║
 ║                                                            ║
 ╠════════════════════════════════════════════════════════════╣
 ║  🧠 آمار Technical ML/NLP:                                 ║
@@ -203,7 +204,7 @@ class UnifiedChatService {
 
   void reset() {
     _technicalService.reset();
-    _casualHandler.resetContext();
+    _casualHandler.reset();
     print('🔄 سیستم یکپارچه بازنشانی شد');
   }
 

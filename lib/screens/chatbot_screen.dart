@@ -26,6 +26,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
 
   double _lastConfidence = 0.0;
   String _lastProvider = '';
+  bool _isCasualMode = false;
 
   @override
   void initState() {
@@ -68,7 +69,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
       });
 
       if (connected) {
-        _showSnackBar('✅ موتور AI محلی آماده است!', Colors.green);
+        _showSnackBar('✅ سیستم AI 4 لایه آماده است!', Colors.green);
       }
     } catch (e) {
       setState(() {
@@ -115,12 +116,16 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
         _isTyping = false;
         _lastConfidence = response.confidence;
         _lastProvider = response.provider ?? 'Local AI';
+        _isCasualMode = response.isCasual;
       });
 
       if (response.provider != null) {
         final confidencePercent = (response.confidence * 100).toStringAsFixed(1);
+        final modeIcon = response.isCasual ? '💬' : '🧠';
+        final modeText = response.isCasual ? 'Casual' : 'Technical';
+
         _showSnackBar(
-          '🧠 ${response.provider} | اطمینان: $confidencePercent%',
+          '$modeIcon ${response.provider} | $modeText | اطمینان: $confidencePercent%',
           _getConfidenceColor(response.confidence),
         );
       }
@@ -154,7 +159,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
 
     _scrollToBottom();
 
-    // typing indicator
     await Future.delayed(const Duration(milliseconds: 500));
 
     final offlineResponse = OfflineResponses.getSmartResponse(query);
@@ -222,6 +226,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                 _aiService.reset();
                 _lastConfidence = 0.0;
                 _lastProvider = '';
+                _isCasualMode = false;
               });
               Navigator.pop(context);
               _showSnackBar('✅ چت و حافظه AI پاک شد', Colors.green);
@@ -229,6 +234,165 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
             color: Colors.red,
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSystemStatsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 600),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.cyan.withOpacity(0.4),
+                          Colors.blue.withOpacity(0.3),
+                        ],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                    ),
+                    child: Row(
+                      textDirection: TextDirection.rtl,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.cyan.withOpacity(0.6),
+                                Colors.blue.withOpacity(0.4),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.analytics_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'آمار سیستم',
+                                textDirection: TextDirection.rtl,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'عملکرد موتور AI',
+                                textDirection: TextDirection.rtl,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                          onPressed: () => Navigator.pop(context),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _buildStatsCard(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            title: 'تعداد مکالمات',
+                            subtitle: 'کل: ${_aiService.totalConversations}',
+                            gradient: [Colors.purple, Colors.pink],
+                            details: [
+                              'غیرفنی: ${_aiService.casualConversationCount}',
+                              'فنی: ${_aiService.technicalConversationCount}',
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          _buildStatsCard(
+                            icon: Icons.memory_rounded,
+                            title: 'حافظه سیستم',
+                            subtitle: '${_messages.length} پیام ذخیره شده',
+                            gradient: [Colors.orange, Colors.deepOrange],
+                            details: [
+                              'پیام‌های کاربر: ${_messages.where((m) => m.isUser).length}',
+                              'پاسخ‌های AI: ${_messages.where((m) => !m.isUser).length}',
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (_lastConfidence > 0) _buildStatsCard(
+                            icon: Icons.speed_rounded,
+                            title: 'آخرین تحلیل',
+                            subtitle: 'اطمینان: ${(_lastConfidence * 100).toInt()}%',
+                            gradient: [Colors.green, Colors.teal],
+                            details: [
+                              'نوع: ${_isCasualMode ? "غیرفنی 💬" : "فنی 🧠"}',
+                              'ارائه‌دهنده: $_lastProvider',
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildDialogButton(
+                      text: 'بستن',
+                      onPressed: () => Navigator.pop(context),
+                      isPrimary: true,
+                      isFullWidth: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -263,7 +427,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -333,7 +496,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                       ],
                     ),
                   ),
-                  // Content
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
@@ -341,43 +503,38 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           _buildCompactAICard(
-                            icon: Icons.layers_rounded,
-                            title: 'معماری سیستم',
-                            subtitle: '4 لایه یکپارچه',
-                            gradient: [Colors.purple, Colors.blue],
-                          ),
-                          const SizedBox(height: 10),
-                          _buildCompactAICard(
-                            icon: Icons.psychology_outlined,
-                            title: 'Casual Handler',
-                            subtitle: '13+ Intent Detection',
+                            icon: Icons.chat_bubble_outline_rounded,
+                            title: 'Layer 0: Casual Handler',
+                            subtitle: 'Intent + Emotion + Sentiment',
                             gradient: [Colors.green, Colors.teal],
                           ),
                           const SizedBox(height: 10),
                           _buildCompactAICard(
-                            icon: Icons.memory_rounded,
-                            title: 'ML/NLP Engine',
-                            subtitle: 'Word2Vec + Neural',
+                            icon: Icons.analytics_outlined,
+                            title: 'Layer 1: Base ML/NLP',
+                            subtitle: 'TF-IDF + Naive Bayes + VADER',
+                            gradient: [Colors.blue, Colors.cyan],
+                          ),
+                          const SizedBox(height: 10),
+                          _buildCompactAICard(
+                            icon: Icons.psychology_outlined,
+                            title: 'Layer 2: Advanced ML/NLP',
+                            subtitle: 'Skip-gram + Attention + MaxEnt',
                             gradient: [Colors.orange, Colors.deepOrange],
                           ),
                           const SizedBox(height: 10),
                           _buildCompactAICard(
-                            icon: Icons.auto_awesome_rounded,
-                            title: 'Advanced Engine',
-                            subtitle: 'Transformer + BERT',
+                            icon: Icons.hub_rounded,
+                            title: 'Layer 3: Integration Bridge',
+                            subtitle: 'Hybrid Fusion + Learning',
                             gradient: [Colors.pink, Colors.purple],
                           ),
                           const SizedBox(height: 16),
                           _buildCompactFeaturesGrid(),
-                          if (_lastConfidence > 0) ...[
-                            const SizedBox(height: 16),
-                            _buildCompactStatsRow(),
-                          ],
                         ],
                       ),
                     ),
                   ),
-                  // Footer
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: _buildDialogButton(
@@ -392,6 +549,93 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatsCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Color> gradient,
+    required List<String> details,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            gradient[0].withOpacity(0.2),
+            gradient[1].withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradient.map((c) => c.withOpacity(0.6)).toList(),
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      title,
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...details.map((detail) => Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Icon(Icons.check_circle_rounded, color: gradient[0], size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  detail,
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }
@@ -462,7 +706,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
   Widget _buildCompactFeaturesGrid() {
     final features = [
       {'icon': '🎯', 'text': 'Intent', 'color': Colors.purple},
-      {'icon': '🔍', 'text': 'Semantic', 'color': Colors.blue},
+      {'icon': '📊', 'text': 'Semantic', 'color': Colors.blue},
       {'icon': '🧩', 'text': 'Context', 'color': Colors.green},
       {'icon': '🔤', 'text': 'NLP', 'color': Colors.orange},
       {'icon': '🎓', 'text': 'Learning', 'color': Colors.pink},
@@ -523,85 +767,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildCompactStatsRow() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 10),
-          child: Text(
-            'آمار جلسه فعلی',
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: _buildCompactStatBox(
-                icon: Icons.speed_rounded,
-                title: 'اطمینان',
-                value: '${(_lastConfidence * 100).toInt()}%',
-                color: _getConfidenceColor(_lastConfidence),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildCompactStatBox(
-                icon: Icons.chat_rounded,
-                title: 'پیام‌ها',
-                value: '${_messages.length}',
-                color: Colors.blue,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCompactStatBox({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.3), color.withOpacity(0.1)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            textDirection: TextDirection.rtl,
-            style: const TextStyle(fontSize: 10, color: Colors.white70),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSuggestionsDialog() {
     final suggestions = OfflineResponses.suggestedQuestions;
 
@@ -631,7 +796,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -682,7 +846,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                       ],
                     ),
                   ),
-                  // List
                   Flexible(
                     child: ListView.builder(
                       shrinkWrap: true,
@@ -1041,10 +1204,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'فعال',
+                        Text(
+                          _isCasualMode ? 'غیرفنی 💬' : 'فنی 🧠',
                           textDirection: TextDirection.rtl,
-                          style: TextStyle(color: Colors.white70, fontSize: 10),
+                          style: const TextStyle(color: Colors.white70, fontSize: 10),
                         ),
                         if (_lastConfidence > 0) ...[
                           const SizedBox(width: 8),
@@ -1075,6 +1238,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
               IconButton(
                 icon: const Icon(Icons.lightbulb_outline_rounded, color: Colors.white, size: 20),
                 onPressed: _showSuggestionsDialog,
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.analytics_outlined, color: Colors.white, size: 20),
+                onPressed: _showSystemStatsDialog,
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(),
               ),
@@ -1213,7 +1382,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
   Widget _buildCompactFeatureChips() {
     final features = [
       {'icon': '🎯', 'text': 'Intent'},
-      {'icon': '🔍', 'text': 'Semantic'},
+      {'icon': '📊', 'text': 'Semantic'},
       {'icon': '🧩', 'text': 'Context'},
       {'icon': '🔤', 'text': 'NLP'},
       {'icon': '🎓', 'text': 'Learning'},
@@ -1562,7 +1731,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Quick Actions Row
                 if (!hasText && !_isLoading)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -1578,6 +1746,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                         ),
                         const SizedBox(width: 6),
                         _buildQuickActionChip(
+                          icon: Icons.analytics_outlined,
+                          label: 'آمار',
+                          gradient: [Colors.cyan.shade600, Colors.blue.shade600],
+                          onTap: _showSystemStatsDialog,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildQuickActionChip(
                           icon: Icons.psychology_outlined,
                           label: 'اطلاعات',
                           gradient: [Colors.blue.shade600, Colors.purple.shade600],
@@ -1586,7 +1761,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                       ],
                     ),
                   ),
-                // Input Row
                 Row(
                   textDirection: TextDirection.rtl,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1630,7 +1804,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                           textDirection: TextDirection.rtl,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            // Emoji Button
                             if (!_isLoading)
                               Padding(
                                 padding: const EdgeInsets.only(right: 4, bottom: 4),
@@ -1655,7 +1828,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                                   constraints: const BoxConstraints(),
                                 ),
                               ),
-                            // Text Field
                             Expanded(
                               child: TextField(
                                 controller: _messageController,
@@ -1695,7 +1867,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                                 },
                               ),
                             ),
-                            // Clear Button
                             if (hasText && !_isLoading)
                               Padding(
                                 padding: const EdgeInsets.only(left: 4, bottom: 4),
@@ -1724,7 +1895,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // Send Button with Animation
                     GestureDetector(
                       onTap: _isLoading || !hasText
                           ? null
@@ -1813,7 +1983,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                     ),
                   ],
                 ),
-                // Character Counter
                 if (hasText && !_isLoading)
                   Padding(
                     padding: const EdgeInsets.only(top: 8, right: 4),
