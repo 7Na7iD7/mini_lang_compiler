@@ -326,7 +326,6 @@ class _CompilationPhasesState extends State<CompilationPhases>
     );
   }
 
-  /// Get total error count from all phases
   int _getErrorCount(CompilerProvider provider) {
     return provider.phases.fold<int>(
       0,
@@ -334,7 +333,6 @@ class _CompilationPhasesState extends State<CompilationPhases>
     );
   }
 
-  /// Update progress animation based on compilation state
   void _updateProgressAnimation(CompilerProvider provider) {
     if (provider.isCompiling) {
       if (!_progressController.isAnimating) {
@@ -1334,7 +1332,6 @@ class _PhaseItemState extends State<_PhaseItem> {
   }
 }
 
-/// Status icon for phase success/failure/cached state
 class _PhaseStatusIcon extends StatelessWidget {
   final bool isSuccessful;
   final bool wasCached;
