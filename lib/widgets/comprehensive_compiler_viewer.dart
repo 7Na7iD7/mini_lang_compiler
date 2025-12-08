@@ -24,11 +24,11 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
   int _selectedPhaseIndex = 0;
 
   // Compiler components
-  late Lexer _lexer;
-  late Parser _parser;
-  late SemanticAnalyzer _semanticAnalyzer;
-  late Optimizer _optimizer;
-  late Interpreter _interpreter;
+  Lexer? _lexer;
+  Parser? _parser;
+  SemanticAnalyzer? _semanticAnalyzer;
+  Optimizer? _optimizer;
+  Interpreter? _interpreter;
 
   // Compilation artifacts
   List<Token>? _tokens;
@@ -85,41 +85,50 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
     _optimizationResult = null;
     _interpreterResult = null;
 
+    // Reset components to prevent stale state access
+    _lexer = null;
+    _parser = null;
+    _semanticAnalyzer = null;
+    _optimizer = null;
+    _interpreter = null;
+
     try {
       // 1. Lexical Analysis
       _lexer = Lexer(widget.sourceCode);
-      _tokens = _lexer.tokenize();
-      if (_lexer.hasErrors) return;
+      _tokens = _lexer!.tokenize();
+      if (_lexer!.hasErrors) return;
 
       // 2. Syntax Analysis
       _parser = Parser(_tokens!);
-      _ast = _parser.parse();
-      if (_parser.hasErrors) return;
+      _ast = _parser!.parse();
+      if (_parser!.hasErrors) return;
 
       // 3. Semantic Analysis
       if (_ast != null) {
         _semanticAnalyzer = SemanticAnalyzer();
-        _semanticAnalyzer.analyze(_ast!);
-        _symbolTable = _semanticAnalyzer.getSymbolTableAsMap();
-        if (_semanticAnalyzer.hasErrors) return;
+        _semanticAnalyzer!.analyze(_ast!);
+        _symbolTable = _semanticAnalyzer!.getSymbolTableAsMap();
+        if (_semanticAnalyzer!.hasErrors) return;
       }
 
       // 4. Optimization
       if (_ast != null) {
         _optimizer = Optimizer(config: OptimizerConfig.aggressive);
-        _optimizationResult = _optimizer.optimize(_ast!);
+        _optimizationResult = _optimizer!.optimize(_ast!);
       }
 
       // 5. Interpretation
       final astToInterpret = _optimizationResult?.optimizedProgram ?? _ast;
       if (astToInterpret != null) {
         _interpreter = Interpreter(astToInterpret);
-        _interpreterResult = _interpreter.interpret();
+        _interpreterResult = _interpreter!.interpret();
       }
     } catch (e) {
       debugPrint('A critical error occurred during compilation: $e');
     } finally {
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
@@ -261,16 +270,17 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
   Widget _buildCompilationSummaryCompact(BuildContext context) {
     final theme = Theme.of(context);
 
-    int totalErrors = (_lexer.errors.length) +
-        (_parser.errors.length) +
-        (_semanticAnalyzer.errors.length) +
-        (_interpreter.errors.where((e) => e.type == MessageType.error).length);
+    // Safely calculate totals with null checks
+    int totalErrors = (_lexer?.errors.length ?? 0) +
+        (_parser?.errors.length ?? 0) +
+        (_semanticAnalyzer?.errors.length ?? 0) +
+        (_interpreter?.errors.where((e) => e.type == MessageType.error).length ?? 0);
 
-    int totalWarnings = (_lexer.warnings.length) +
-        (_parser.warnings.length) +
-        (_semanticAnalyzer.warnings.length) +
+    int totalWarnings = (_lexer?.warnings.length ?? 0) +
+        (_parser?.warnings.length ?? 0) +
+        (_semanticAnalyzer?.warnings.length ?? 0) +
         (_optimizationResult?.warnings.length ?? 0) +
-        (_interpreter.errors.where((e) => e.type == MessageType.warning).length);
+        (_interpreter?.errors.where((e) => e.type == MessageType.warning).length ?? 0);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -478,11 +488,11 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
 
   bool _getPhaseHasError(int index) {
     switch (index) {
-      case 0: return _lexer.hasErrors;
-      case 1: return _parser.hasErrors;
-      case 2: return _semanticAnalyzer.hasErrors;
+      case 0: return _lexer?.hasErrors ?? false;
+      case 1: return _parser?.hasErrors ?? false;
+      case 2: return _semanticAnalyzer?.hasErrors ?? false;
       case 3: return _optimizationResult?.warnings.isNotEmpty ?? false;
-      case 4: return _interpreter.errors.isNotEmpty;
+      case 4: return _interpreter?.errors.isNotEmpty ?? false;
       default: return false;
     }
   }
@@ -501,16 +511,17 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
   Widget _buildCompilationSummary(BuildContext context) {
     final theme = Theme.of(context);
 
-    int totalErrors = (_lexer.errors.length) +
-        (_parser.errors.length) +
-        (_semanticAnalyzer.errors.length) +
-        (_interpreter.errors.where((e) => e.type == MessageType.error).length);
+    // Safely calculate totals
+    int totalErrors = (_lexer?.errors.length ?? 0) +
+        (_parser?.errors.length ?? 0) +
+        (_semanticAnalyzer?.errors.length ?? 0) +
+        (_interpreter?.errors.where((e) => e.type == MessageType.error).length ?? 0);
 
-    int totalWarnings = (_lexer.warnings.length) +
-        (_parser.warnings.length) +
-        (_semanticAnalyzer.warnings.length) +
+    int totalWarnings = (_lexer?.warnings.length ?? 0) +
+        (_parser?.warnings.length ?? 0) +
+        (_semanticAnalyzer?.warnings.length ?? 0) +
         (_optimizationResult?.warnings.length ?? 0) +
-        (_interpreter.errors.where((e) => e.type == MessageType.warning).length);
+        (_interpreter?.errors.where((e) => e.type == MessageType.warning).length ?? 0);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -586,20 +597,20 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
       case 0:
         return LexerPhaseViewer(
           tokens: _tokens,
-          errors: _lexer.errors,
-          warnings: _lexer.warnings,
+          errors: _lexer?.errors ?? [],
+          warnings: _lexer?.warnings ?? [],
         );
       case 1:
         return ParserPhaseViewer(
           ast: _ast,
-          errors: _parser.errors,
-          warnings: _parser.warnings,
+          errors: _parser?.errors ?? [],
+          warnings: _parser?.warnings ?? [],
         );
       case 2:
         return SemanticPhaseViewer(
           symbolTable: _symbolTable,
-          errors: _semanticAnalyzer.errors,
-          warnings: _semanticAnalyzer.warnings,
+          errors: _semanticAnalyzer?.errors ?? [],
+          warnings: _semanticAnalyzer?.warnings ?? [],
         );
       case 3:
         return OptimizerPhaseViewer(
@@ -609,7 +620,7 @@ class _ComprehensiveCompilerViewerState extends State<ComprehensiveCompilerViewe
       case 4:
         return InterpreterPhaseViewer(
           result: _interpreterResult,
-          errors: _interpreter.errors,
+          errors: _interpreter?.errors ?? [],
         );
       default:
         return const Center(child: Text('Select a compilation phase'));

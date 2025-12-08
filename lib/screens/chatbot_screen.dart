@@ -1733,7 +1733,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
               children: [
                 if (!hasText && !_isLoading)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       textDirection: TextDirection.rtl,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1744,14 +1744,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                           gradient: [Colors.amber.shade600, Colors.orange.shade600],
                           onTap: _showSuggestionsDialog,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         _buildQuickActionChip(
                           icon: Icons.analytics_outlined,
                           label: 'آمار',
                           gradient: [Colors.cyan.shade600, Colors.blue.shade600],
                           onTap: _showSystemStatsDialog,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         _buildQuickActionChip(
                           icon: Icons.psychology_outlined,
                           label: 'اطلاعات',
@@ -1769,19 +1769,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: hasText || _isLoading
-                                ? [
-                              Colors.white,
-                              Colors.white,
-                            ]
-                                : [
-                              Colors.white.withOpacity(0.95),
-                              Colors.white.withOpacity(0.9),
-                            ],
-                          ),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
                             color: hasText
@@ -1802,36 +1790,42 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                         ),
                         child: Row(
                           textDirection: TextDirection.rtl,
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             if (!_isLoading)
                               Padding(
-                                padding: const EdgeInsets.only(right: 4, bottom: 4),
-                                child: IconButton(
-                                  icon: ShaderMask(
-                                    shaderCallback: (bounds) => LinearGradient(
-                                      colors: [
-                                        Colors.purple.shade400,
-                                        Colors.blue.shade400,
-                                      ],
-                                    ).createShader(bounds),
-                                    child: const Icon(
-                                      Icons.sentiment_satisfied_alt_rounded,
-                                      color: Colors.white,
-                                      size: 22,
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () {
+                                      _showSnackBar('😊 قابلیت Emoji به زودی...', Colors.blue);
+                                    },
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(6),
+                                      child: ShaderMask(
+                                        shaderCallback: (bounds) => LinearGradient(
+                                          colors: [
+                                            Colors.purple.shade400,
+                                            Colors.blue.shade400,
+                                          ],
+                                        ).createShader(bounds),
+                                        child: const Icon(
+                                          Icons.sentiment_satisfied_alt_rounded,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  onPressed: () {
-                                    _showSnackBar('😊 قابلیت Emoji به زودی...', Colors.blue);
-                                  },
-                                  padding: const EdgeInsets.all(8),
-                                  constraints: const BoxConstraints(),
                                 ),
                               ),
                             Expanded(
                               child: TextField(
                                 controller: _messageController,
                                 textDirection: TextDirection.rtl,
+                                textAlign: TextAlign.right,
                                 maxLines: null,
                                 minLines: 1,
                                 maxLength: 500,
@@ -1842,7 +1836,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                                   color: Colors.black87,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
-                                  height: 1.3,
+                                  height: 1.4,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: _isLoading
@@ -1850,15 +1844,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                                       : 'سوال خود را بپرسید... 💭',
                                   hintTextDirection: TextDirection.rtl,
                                   hintStyle: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 13,
+                                    color: Colors.grey.shade400,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.normal,
                                   ),
                                   border: InputBorder.none,
                                   counterText: '',
                                   contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 10,
+                                    horizontal: 12,
+                                    vertical: 12,
                                   ),
                                   isDense: true,
                                 ),
@@ -1869,25 +1863,27 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                             ),
                             if (hasText && !_isLoading)
                               Padding(
-                                padding: const EdgeInsets.only(left: 4, bottom: 4),
-                                child: IconButton(
-                                  icon: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.close_rounded,
-                                      color: Colors.grey.shade600,
-                                      size: 16,
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() => _messageController.clear());
+                                    },
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        color: Colors.grey.shade600,
+                                        size: 18,
+                                      ),
                                     ),
                                   ),
-                                  onPressed: () {
-                                    setState(() => _messageController.clear());
-                                  },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
                                 ),
                               ),
                           ],
@@ -1905,7 +1901,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with TickerProviderStateM
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeOut,
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           gradient: _isLoading
                               ? LinearGradient(
